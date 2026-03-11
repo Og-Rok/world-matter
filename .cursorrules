@@ -1,0 +1,37 @@
+# Project Naming Conventions
+
+## CRITICAL: All code must follow these naming conventions
+
+### Classes and Namespaces
+- **PascalCase** for class names
+- **PascalCase** for namespace names
+- Example: `public class JobManager : Node`
+- Example: `namespace ProjectBigBlue`
+
+### Functions/Methods
+- **camelCase** for all function and method names
+- This applies to both public and private methods
+- Note: Godot lifecycle methods (`_Ready()`, `_Process()`, `_ExitTree()`, etc.) must remain PascalCase as required by Godot
+- Example: `public void scheduleJob(IJob job, Action callback = null)`
+- Example: `private void backgroundWorkerLoop(int thread_index)`
+
+### Variables
+- **snake_case** for all variable names (including private fields)
+- This includes local variables, instance variables, and parameters
+- **Note**: Variable names do NOT need to start with an underscore (`_`). The underscore prefix is only used by godot lifecycle methods.
+- Example: `private readonly ConcurrentQueue<JobWithCallback> _job_queue = new();` (underscore optional)
+- Example: `private readonly ConcurrentQueue<JobWithCallback> job_queue = new();` (also valid)
+- Example: `int thread_index = i;`
+- Example: `JobWithCallback job_with_callback`
+
+### Interfaces
+- **PascalCase** with "I" prefix (standard C# convention)
+- Example: `public interface IJob`
+
+### Summary
+- Classes: PascalCase
+- Namespaces: PascalCase
+- Functions: camelCase (except Godot lifecycle methods)
+- Variables: snake_case
+- Interfaces: PascalCase with "I" prefix
+
