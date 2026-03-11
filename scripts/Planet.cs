@@ -4,10 +4,13 @@ using System.Collections.Generic;
 [Tool]
 public partial class Planet : Node3D
 {
-    [Export] public int num_points = 100;
-    [Export] public float radius = 10.0f;
-    [Export] public int noise_seed = 0;
+    [Export] public int num_points    = 100;
+    [Export] public float radius      = 10.0f;
+    [Export] public int num_plates    = 8;
+    [Export] public int noise_seed    = 0;
     [Export] public float noise_frequency = 1.0f;
+    [Export] public int max_lod_depth = 4;
+    [Export] public float lod_distance = 2.0f;
 
     // Checking this box in the inspector triggers a regeneration.
     // The getter always returns false so the checkbox resets after firing.
@@ -31,45 +34,110 @@ public partial class Planet : Node3D
             child.QueueFree();
 
         point_positions = generatePoints(num_points, radius);
-        var triangles = computeConvexHull(point_positions);
+        var triangles   = computeConvexHull(point_positions);
 
-        var noise = new FastNoiseLite
-        {
-            NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin,
-            Seed      = noise_seed,
-            Frequency = noise_frequency * 0.1f
-        };
-
-        // Pre-compute one colour per vertex so shared vertices stay consistent
-        var vertex_colors = new Color[point_positions.Length];
-        for (int i = 0; i < point_positions.Length; i++)
-        {
-            Vector3 unit = point_positions[i].Normalized();
-            float n = noise.GetNoise3D(unit.X, unit.Y, unit.Z);
-            vertex_colors[i] = terrainColor(n);
-        }
-
-        // One shared material for all triangle children
         var material = new StandardMaterial3D
         {
             VertexColorUseAsAlbedo = true,
             Transparency = BaseMaterial3D.TransparencyEnum.Disabled
         };
 
-        foreach (var (a, b, c) in triangles)
+        int actual_plates      = Mathf.Min(num_plates, triangles.Count);
+        int[] plate_assignment = generateTectonicPlates(triangles, actual_plates);
+
+        var plate_colors = new Color[actual_plates];
+        for (int p = 0; p < actual_plates; p++)
+            plate_colors[p] = Color.FromHsv((float)p / actual_plates, 0.7f, 0.85f);
+
+        var scene_root = GetTree().EditedSceneRoot;
+
+        var continents = new Continent[actual_plates];
+        for (int p = 0; p < actual_plates; p++)
         {
-            var triangle_node = new MeshInstance3D
-            {
-                Name = "Face " + a + " " + b + " " + c,
-                Mesh = buildTriangleMesh(
-                    point_positions[a], point_positions[b], point_positions[c],
-                    vertex_colors[a], vertex_colors[b], vertex_colors[c]
-                ),
-                MaterialOverride = material
-            };
-            AddChild(triangle_node);
-            triangle_node.Owner = GetTree().EditedSceneRoot;
+            continents[p] = new Continent();
+            continents[p].initialize(p, plate_colors[p], radius, max_lod_depth, lod_distance, material);
+            AddChild(continents[p]);
+            continents[p].Owner = scene_root;
         }
+
+        for (int i = 0; i < triangles.Count; i++)
+        {
+            var (a, b, c) = triangles[i];
+            continents[plate_assignment[i]].addTriangle(
+                point_positions[a], point_positions[b], point_positions[c], scene_root);
+        }
+    }
+
+    // Multi-source BFS from random seeds — plates expand simultaneously, producing
+    // Voronoi-like regions across the triangle adjacency graph.
+    private int[] generateTectonicPlates(List<(int a, int b, int c)> triangles, int plate_count)
+    {
+        int n = triangles.Count;
+
+        // Map each undirected edge to the triangles that share it
+        var edge_to_tris = new Dictionary<(int, int), List<int>>();
+        for (int i = 0; i < n; i++)
+        {
+            var (a, b, c) = triangles[i];
+            registerEdge(edge_to_tris, a, b, i);
+            registerEdge(edge_to_tris, b, c, i);
+            registerEdge(edge_to_tris, c, a, i);
+        }
+
+        var adjacency = new List<int>[n];
+        for (int i = 0; i < n; i++) adjacency[i] = new List<int>();
+        foreach (var (_, tris) in edge_to_tris)
+        {
+            if (tris.Count == 2)
+            {
+                adjacency[tris[0]].Add(tris[1]);
+                adjacency[tris[1]].Add(tris[0]);
+            }
+        }
+
+        var rng = new RandomNumberGenerator();
+        rng.Seed = (ulong)Mathf.Abs(noise_seed) + 1;
+
+        var assignments = new int[n];
+        for (int i = 0; i < n; i++) assignments[i] = -1;
+
+        var queue       = new Queue<int>();
+        var used_seeds  = new HashSet<int>();
+
+        for (int p = 0; p < plate_count; p++)
+        {
+            int seed;
+            do { seed = rng.RandiRange(0, n - 1); } while (used_seeds.Contains(seed));
+            used_seeds.Add(seed);
+            assignments[seed] = p;
+            queue.Enqueue(seed);
+        }
+
+        while (queue.Count > 0)
+        {
+            int tri = queue.Dequeue();
+            foreach (int neighbor in adjacency[tri])
+            {
+                if (assignments[neighbor] == -1)
+                {
+                    assignments[neighbor] = assignments[tri];
+                    queue.Enqueue(neighbor);
+                }
+            }
+        }
+
+        return assignments;
+    }
+
+    private void registerEdge(Dictionary<(int, int), List<int>> edge_map, int a, int b, int tri_idx)
+    {
+        var key = a < b ? (a, b) : (b, a);
+        if (!edge_map.TryGetValue(key, out var list))
+        {
+            list = new List<int>();
+            edge_map[key] = list;
+        }
+        list.Add(tri_idx);
     }
 
     private Vector3[] generatePoints(int count, float sphere_radius)
@@ -199,19 +267,6 @@ public partial class Planet : Node3D
             else
                 faces.Add((eb, ea, new_idx));
         }
-    }
-
-    private ArrayMesh buildTriangleMesh(Vector3 va, Vector3 vb, Vector3 vc, Color ca, Color cb, Color cc)
-    {
-        var arrays = new Godot.Collections.Array();
-        arrays.Resize((int)Mesh.ArrayType.Max);
-        arrays[(int)Mesh.ArrayType.Vertex] = new Vector3[] { va, vc, vb };
-        arrays[(int)Mesh.ArrayType.Normal] = new Vector3[] { va.Normalized(), vc.Normalized(), vb.Normalized() };
-        arrays[(int)Mesh.ArrayType.Color]  = new Color[]   { ca, cc, cb };
-
-        var mesh = new ArrayMesh();
-        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
-        return mesh;
     }
 
     // Maps a Perlin noise value in [-1, 1] to a terrain colour gradient.
