@@ -9,8 +9,9 @@ public partial class Planet : Node3D
     [Export] public int num_plates    = 8;
     [Export] public int noise_seed    = 0;
     [Export] public float noise_frequency = 1.0f;
-    [Export] public int max_lod_depth = 4;
-    [Export] public float lod_distance = 2.0f;
+    [Export] public int max_lod_depth     = 4;
+    [Export] public float lod_distance   = 1.01f;
+    [Export] public float mountain_height = 1.0f;
 
     // Checking this box in the inspector triggers a regeneration.
     // The getter always returns false so the checkbox resets after firing.
@@ -31,10 +32,19 @@ public partial class Planet : Node3D
     private void regenerate()
     {
         foreach (Node child in GetChildren())
+        {
             child.QueueFree();
+        }
 
         point_positions = generatePoints(num_points, radius);
         var triangles   = computeConvexHull(point_positions);
+
+        var terrain_noise = new FastNoiseLite
+        {
+            NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin,
+            Seed      = noise_seed,
+            Frequency = noise_frequency * 0.1f
+        };
 
         var material = new StandardMaterial3D
         {
@@ -47,7 +57,9 @@ public partial class Planet : Node3D
 
         var plate_colors = new Color[actual_plates];
         for (int p = 0; p < actual_plates; p++)
+        {
             plate_colors[p] = Color.FromHsv((float)p / actual_plates, 0.7f, 0.85f);
+        }
 
         var scene_root = GetTree().EditedSceneRoot;
 
@@ -55,7 +67,7 @@ public partial class Planet : Node3D
         for (int p = 0; p < actual_plates; p++)
         {
             continents[p] = new Continent();
-            continents[p].initialize(p, plate_colors[p], radius, max_lod_depth, lod_distance, material);
+            continents[p].initialize(p, plate_colors[p], radius, max_lod_depth, lod_distance, terrain_noise, mountain_height, material);
             AddChild(continents[p]);
             continents[p].Owner = scene_root;
         }
@@ -63,8 +75,7 @@ public partial class Planet : Node3D
         for (int i = 0; i < triangles.Count; i++)
         {
             var (a, b, c) = triangles[i];
-            continents[plate_assignment[i]].addTriangle(
-                point_positions[a], point_positions[b], point_positions[c], scene_root);
+            continents[plate_assignment[i]].addTriangle(point_positions[a], point_positions[b], point_positions[c], scene_root);
         }
     }
 

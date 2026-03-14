@@ -9,8 +9,11 @@ public class TriNode
     public TriNode[] children;       // null when this is a leaf
     public MeshInstance3D mesh_instance;
 
-    public Vector3 center   => (va + vb + vc) / 3.0f;
-    public bool    is_leaf  => children == null;
+    // Centre of the actual rendered (displaced) triangle, cached at spawn time
+    // so LOD distance checks don't need to recompute noise every frame.
+    public Vector3 mesh_center;
+
+    public bool is_leaf => children == null;
 
     public TriNode(Vector3 a, Vector3 b, Vector3 c, int d)
     {
@@ -30,6 +33,8 @@ public partial class TriTree : Node3D
     private StandardMaterial3D  shared_material;
     private int                 max_depth;
     private float               lod_distance;
+    private FastNoiseLite       terrain_noise;
+    private float               mountain_height;
 
     // Root triangle vertices — stored so getCentroid() works without traversing the tree.
     private Vector3 root_va, root_vb, root_vc;
@@ -40,6 +45,8 @@ public partial class TriTree : Node3D
         Color   color,
         int     depth_limit,
         float   lod_dist,
+        FastNoiseLite noise,
+        float   height,
         StandardMaterial3D material)
     {
         root_va = va; root_vb = vb; root_vc = vc;
@@ -47,9 +54,12 @@ public partial class TriTree : Node3D
         face_color      = color;
         max_depth       = depth_limit;
         lod_distance    = lod_dist;
+        terrain_noise   = noise;
+        mountain_height = height;
         shared_material = material;
 
         root = new TriNode(va, vb, vc, 0);
+        root.mesh_center   = displacedCenter(va, vb, vc);
         root.mesh_instance = spawnMesh(va, vb, vc);
     }
 
@@ -74,7 +84,7 @@ public partial class TriTree : Node3D
         // Split distance halves at each depth level so deeper triangles only
         // subdivide when the camera is very close.
         float split_dist = sphere_radius * lod_distance / Mathf.Pow(2.0f, node.depth);
-        float dist       = target_pos.DistanceTo(node.center);
+        float dist       = target_pos.DistanceTo(node.mesh_center);
 
         if (dist < split_dist && node.depth < max_depth)
         {
@@ -129,17 +139,27 @@ public partial class TriTree : Node3D
     private TriNode spawnChild(Vector3 va, Vector3 vb, Vector3 vc, int depth)
     {
         var node = new TriNode(va, vb, vc, depth);
+        node.mesh_center   = displacedCenter(va, vb, vc);
         node.mesh_instance = spawnMesh(va, vb, vc);
         return node;
     }
 
     private MeshInstance3D spawnMesh(Vector3 va, Vector3 vb, Vector3 vc)
     {
+        // Displace vertices along the sphere normal before building the mesh.
+        // TriNode stores undisplaced sphere-surface positions so subdivision
+        // midpoints stay consistent regardless of depth.
+        Vector3 dva = displace(va);
+        Vector3 dvb = displace(vb);
+        Vector3 dvc = displace(vc);
+
         var arrays = new Godot.Collections.Array();
         arrays.Resize((int)Mesh.ArrayType.Max);
         // CCW winding (b and c swapped to match the rest of the planet)
-        arrays[(int)Mesh.ArrayType.Vertex] = new Vector3[] { va, vc, vb };
-        arrays[(int)Mesh.ArrayType.Normal] = new Vector3[] { va.Normalized(), vc.Normalized(), vb.Normalized() };
+        arrays[(int)Mesh.ArrayType.Vertex] = new Vector3[] { dva, dvc, dvb };
+        // Use the displaced position normalised as the vertex normal so shading
+        // follows the deformed surface rather than the original sphere.
+        arrays[(int)Mesh.ArrayType.Normal] = new Vector3[] { dva.Normalized(), dvc.Normalized(), dvb.Normalized() };
         arrays[(int)Mesh.ArrayType.Color]  = new Color[]   { face_color, face_color, face_color };
 
         var mesh = new ArrayMesh();
@@ -148,6 +168,19 @@ public partial class TriTree : Node3D
         var instance = new MeshInstance3D { Mesh = mesh, MaterialOverride = shared_material };
         AddChild(instance);
         return instance;
+    }
+
+    private Vector3 displacedCenter(Vector3 va, Vector3 vb, Vector3 vc)
+        => (displace(va) + displace(vb) + displace(vc)) / 3.0f;
+
+    // Displaces a sphere-surface point radially by Perlin noise.
+    // Sampling at the unit-sphere position makes the result radius-independent
+    // and seamless across plate boundaries.
+    private Vector3 displace(Vector3 v)
+    {
+        Vector3 unit        = v.Normalized();
+        float   noise_val   = terrain_noise.GetNoise3D(unit.X, unit.Y, unit.Z); // -1..1
+        return  unit * (sphere_radius + noise_val * mountain_height);
     }
 
     private Vector3 projectToSphere(Vector3 v) => v.Normalized() * sphere_radius;

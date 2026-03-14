@@ -10,17 +10,22 @@ public partial class Continent : Node3D
     private float               sphere_radius;
     private int                 max_lod_depth;
     private float               lod_distance;
+    private FastNoiseLite       terrain_noise;
+    private float               mountain_height;
     private StandardMaterial3D  shared_material;
 
     private readonly List<TriTree> tri_trees = new();
 
-    public void initialize(int index, Color color, float radius, int lod_depth, float lod_dist, StandardMaterial3D material)
+    public void initialize(int index, Color color, float radius, int lod_depth, float lod_dist,
+                           FastNoiseLite noise, float height, StandardMaterial3D material)
     {
         plate_index     = index;
         plate_color     = color;
         sphere_radius   = radius;
         max_lod_depth   = lod_depth;
         lod_distance    = lod_dist;
+        terrain_noise   = noise;
+        mountain_height = height;
         shared_material = material;
         Name = $"Continent_{index}";
     }
@@ -30,7 +35,8 @@ public partial class Continent : Node3D
         var tree = new TriTree();
         AddChild(tree);
         tree.Owner = scene_root;
-        tree.initialize(va, vb, vc, sphere_radius, plate_color, max_lod_depth, lod_distance, shared_material);
+        tree.initialize(va, vb, vc, sphere_radius, plate_color, max_lod_depth, lod_distance,
+                        terrain_noise, mountain_height, shared_material);
         tri_trees.Add(tree);
     }
 
