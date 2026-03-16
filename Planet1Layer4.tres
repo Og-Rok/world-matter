@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="PlanetLODSettings" format=3 uid="uid://si1rq4xyasdt"]
+
+[ext_resource type="Script" uid="uid://bpjlu0kbl8q6c" path="res://scripts/PlanetLODSettings.cs" id="1_rvbuj"]
+
+[resource]
+script = ExtResource("1_rvbuj")
+distance = 12.5
+divisions = 4
+metadata/_custom_type_script = "uid://bpjlu0kbl8q6c"

@@ -2,9 +2,15 @@ using Godot;
 
 public partial class CameraController : Camera3D
 {
+    public static CameraController instance;
     [Export] public float move_speed       = 10.0f;
     [Export] public float mouse_sensitivity = 0.002f;
     [Export] public float roll_speed       = 1.5f;
+
+    public override void _EnterTree()
+    {
+        instance = this;
+    }
 
     public override void _Ready()
     {
