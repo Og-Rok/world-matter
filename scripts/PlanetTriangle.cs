@@ -236,22 +236,24 @@ public partial class PlanetTriangle : Node3D
 
 	public void generateMesh()
 	{
-		Color face_color = new Color(1.0f, 1.0f, 1.0f);
 		StandardMaterial3D shared_material = new StandardMaterial3D
 		{
 			VertexColorUseAsAlbedo = true,
 			Transparency = BaseMaterial3D.TransparencyEnum.Disabled
 		};
 
-		Vector3 va = displaceVertex(projectToSphere(point_a));
-		Vector3 vb = displaceVertex(projectToSphere(point_b));
-		Vector3 vc = displaceVertex(projectToSphere(point_c));
+		Vector3 sa = projectToSphere(point_a);
+		Vector3 sb = projectToSphere(point_b);
+		Vector3 sc = projectToSphere(point_c);
+		Vector3 va = displaceVertex(sa);
+		Vector3 vb = displaceVertex(sb);
+		Vector3 vc = displaceVertex(sc);
 
 		var arrays = new Godot.Collections.Array();
 		arrays.Resize((int)Mesh.ArrayType.Max);
 		arrays[(int)Mesh.ArrayType.Vertex] = new Vector3[] { va, vc, vb };
 		arrays[(int)Mesh.ArrayType.Normal] = new Vector3[] { va.Normalized(), vc.Normalized(), vb.Normalized() };
-		arrays[(int)Mesh.ArrayType.Color] = new Color[] { face_color, face_color, face_color };
+		arrays[(int)Mesh.ArrayType.Color] = new Color[] { vertexColor(sa), vertexColor(sc), vertexColor(sb) };
 
 		var mesh = new ArrayMesh();
 		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
@@ -318,6 +320,7 @@ public partial class PlanetTriangle : Node3D
 
 			// Build index list (triangles, 3 verts per triangle)
 			List<Vector3> new_verts = new List<Vector3>();
+			List<Color> new_colors = new List<Color>();
 			for (int j = 0; j < vertices.Length; j += 3)
 			{
 				// Original triangle vertices, re-projected to the planet radius to avoid drift.
@@ -331,18 +334,17 @@ public partial class PlanetTriangle : Node3D
 				Vector3 m2 = projectToSphere((v2 + v0) * 0.5f);
 
 				// Four new triangles with consistent outward winding.
-				addTriangleOnSphere(new_verts, v0, m0, m2);
-				addTriangleOnSphere(new_verts, m0, v1, m1);
-				addTriangleOnSphere(new_verts, m2, m1, v2);
-				addTriangleOnSphere(new_verts, m0, m1, m2);
+				addTriangleOnSphere(new_verts, new_colors, v0, m0, m2);
+				addTriangleOnSphere(new_verts, new_colors, m0, v1, m1);
+				addTriangleOnSphere(new_verts, new_colors, m2, m1, v2);
+				addTriangleOnSphere(new_verts, new_colors, m0, m1, m2);
 			}
 
 			// Remove previous surface
 			mesh.ClearSurfaces();
 
 			// Rebuild color and normal arrays
-			Color face_color = new Color(1.0f, 1.0f, 1.0f);
-			Color[] colors = Enumerable.Repeat(face_color, new_verts.Count).ToArray();
+			Color[] colors = new_colors.ToArray();
 			Vector3[] normals = new_verts.Select(v => v.Normalized()).ToArray();
 
 			var new_arrays = new Godot.Collections.Array();
@@ -361,7 +363,7 @@ public partial class PlanetTriangle : Node3D
 		return v.Normalized() * planet.radius;
 	}
 
-	private void addTriangleOnSphere(List<Vector3> verts, Vector3 a, Vector3 b, Vector3 c)
+	private void addTriangleOnSphere(List<Vector3> verts, List<Color> colors, Vector3 a, Vector3 b, Vector3 c)
 	{
 		// Ensure points are on the sphere.
 		a = projectToSphere(a);
@@ -378,10 +380,13 @@ public partial class PlanetTriangle : Node3D
 			(b, c) = (c, b);
 		}
 
-		// Displace by terrain noise so same 3D position always gets same height at every LOD.
+		// Displace by terrain noise and color by height (same position => same color at every LOD).
 		verts.Add(displaceVertex(a));
 		verts.Add(displaceVertex(b));
 		verts.Add(displaceVertex(c));
+		colors.Add(vertexColor(a));
+		colors.Add(vertexColor(b));
+		colors.Add(vertexColor(c));
 	}
 
 	/// <summary>
@@ -392,5 +397,11 @@ public partial class PlanetTriangle : Node3D
 		if (planet == null) return sphere_pos;
 		float h = planet.getTerrainDisplacement(sphere_pos);
 		return sphere_pos + sphere_pos.Normalized() * h;
+	}
+
+	private Color vertexColor(Vector3 sphere_pos)
+	{
+		if (planet == null) return new Color(1.0f, 1.0f, 1.0f);
+		return planet.getTerrainColor(sphere_pos);
 	}
 }

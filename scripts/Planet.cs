@@ -26,7 +26,12 @@ public partial class Planet : Node3D
     [Export] public float terrain_fractal_lacunarity = 2.0f;
     [Export] public float terrain_fractal_gain = 0.5f;
 
+    public enum TerrainColorMode { Grid, ColourBlobs }
+    [Export] public TerrainColorMode terrain_color_mode = TerrainColorMode.Grid;
+    [Export] public float terrain_color_grid_scale = 10.0f;
+
     private FastNoiseLite terrain_noise;
+    private FastNoiseLite color_noise;
     private Vector3[] point_positions;
     private List<(int a, int b, int c)> triangles;
 
@@ -216,6 +221,43 @@ public partial class Planet : Node3D
         float scale = terrain_noise_frequency;
         float n = terrain_noise.GetNoise3D(unit.X * scale, unit.Y * scale, unit.Z * scale);
         return n * terrain_height_scale;
+    }
+
+    /// <summary>
+    /// Returns a vertex color for the given sphere position. Grid = grey/white cells; ColourBlobs = noise-driven blobs.
+    /// </summary>
+    public Color getTerrainColor(Vector3 pos_in_planet_space)
+    {
+        Vector3 unit = pos_in_planet_space.Normalized();
+        if (terrain_color_mode == TerrainColorMode.Grid)
+        {
+            float s = terrain_color_grid_scale;
+            int cell = (int)Mathf.Floor(unit.X * s) + (int)Mathf.Floor(unit.Y * s) + (int)Mathf.Floor(unit.Z * s);
+            return (cell % 2 == 0) ? new Color(0.35f, 0.35f, 0.35f) : new Color(0.9f, 0.9f, 0.9f);
+        }
+        // ColourBlobs: deterministic from position, smooth blob-like regions
+        ensureColorNoise();
+        float n = color_noise.GetNoise3D(unit.X, unit.Y, unit.Z);
+        float t = Mathf.Clamp((n + 1.0f) * 0.5f, 0.0f, 1.0f);
+        Color[] palette = {
+            new Color(0.9f, 0.35f, 0.3f),
+            new Color(0.3f, 0.5f, 0.9f),
+            new Color(0.95f, 0.85f, 0.25f),
+            new Color(0.4f, 0.75f, 0.4f),
+            new Color(0.85f, 0.5f, 0.2f),
+            new Color(0.7f, 0.4f, 0.85f)
+        };
+        int i = (int)Mathf.Clamp(t * palette.Length, 0, palette.Length - 1);
+        return palette[i];
+    }
+
+    private void ensureColorNoise()
+    {
+        if (color_noise != null) return;
+        color_noise = new FastNoiseLite();
+        color_noise.Seed = terrain_noise_seed + 12345;
+        color_noise.NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin;
+        color_noise.Frequency = 0.8f;
     }
 
     private void ensureTerrainNoise()
