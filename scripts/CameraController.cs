@@ -35,7 +35,7 @@ public partial class CameraController : Camera3D
 
     public override void _Process(double delta)
     {
-        GetViewport().DebugDraw = Viewport.DebugDrawEnum.Wireframe;
+        // GetViewport().DebugDraw = Viewport.DebugDrawEnum.Wireframe;
         if (Input.MouseMode != Input.MouseModeEnum.Captured)
         {
             return;

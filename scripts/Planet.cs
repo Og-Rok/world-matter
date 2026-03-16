@@ -18,6 +18,15 @@ public partial class Planet : Node3D
         set { if (value) regenerate(); }
     }
 
+    [ExportGroup("Terrain noise")]
+    [Export] public int terrain_noise_seed = 0;
+    [Export] public float terrain_noise_frequency = 1.0f;
+    [Export] public float terrain_height_scale = 2.0f;
+    [Export] public int terrain_fractal_octaves = 4;
+    [Export] public float terrain_fractal_lacunarity = 2.0f;
+    [Export] public float terrain_fractal_gain = 0.5f;
+
+    private FastNoiseLite terrain_noise;
     private Vector3[] point_positions;
     private List<(int a, int b, int c)> triangles;
 
@@ -194,6 +203,32 @@ public partial class Planet : Node3D
     private static float triangleArea(Vector3 a, Vector3 b, Vector3 c)
     {
         return 0.5f * (b - a).Cross(c - a).Length();
+    }
+
+    /// <summary>
+    /// Returns terrain height displacement (in local space) for a point on the planet.
+    /// Sampling uses 3D position so the same spot always gets the same value at every LOD.
+    /// </summary>
+    public float getTerrainDisplacement(Vector3 pos_in_planet_space)
+    {
+        ensureTerrainNoise();
+        Vector3 unit = pos_in_planet_space.Normalized();
+        float scale = terrain_noise_frequency;
+        float n = terrain_noise.GetNoise3D(unit.X * scale, unit.Y * scale, unit.Z * scale);
+        return n * terrain_height_scale;
+    }
+
+    private void ensureTerrainNoise()
+    {
+        if (terrain_noise != null) return;
+        terrain_noise = new FastNoiseLite();
+        terrain_noise.Seed = terrain_noise_seed;
+        terrain_noise.NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin;
+        terrain_noise.FractalType = FastNoiseLite.FractalTypeEnum.Fbm;
+        terrain_noise.Frequency = 1.0f;
+        terrain_noise.FractalOctaves = terrain_fractal_octaves;
+        terrain_noise.FractalLacunarity = terrain_fractal_lacunarity;
+        terrain_noise.FractalGain = terrain_fractal_gain;
     }
 
 }

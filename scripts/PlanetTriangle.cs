@@ -243,10 +243,14 @@ public partial class PlanetTriangle : Node3D
 			Transparency = BaseMaterial3D.TransparencyEnum.Disabled
 		};
 
+		Vector3 va = displaceVertex(projectToSphere(point_a));
+		Vector3 vb = displaceVertex(projectToSphere(point_b));
+		Vector3 vc = displaceVertex(projectToSphere(point_c));
+
 		var arrays = new Godot.Collections.Array();
 		arrays.Resize((int)Mesh.ArrayType.Max);
-		arrays[(int)Mesh.ArrayType.Vertex] = new Vector3[] { point_a, point_c, point_b };
-		arrays[(int)Mesh.ArrayType.Normal] = new Vector3[] { point_a.Normalized(), point_c.Normalized(), point_b.Normalized() };
+		arrays[(int)Mesh.ArrayType.Vertex] = new Vector3[] { va, vc, vb };
+		arrays[(int)Mesh.ArrayType.Normal] = new Vector3[] { va.Normalized(), vc.Normalized(), vb.Normalized() };
 		arrays[(int)Mesh.ArrayType.Color] = new Color[] { face_color, face_color, face_color };
 
 		var mesh = new ArrayMesh();
@@ -368,15 +372,25 @@ public partial class PlanetTriangle : Node3D
 		// triangles wound the opposite way, so flip when the normal points *outward* relative
 		// to the sphere center (origin) to keep the visible side outside.
 		Vector3 n = (b - a).Cross(c - a);
-		Vector3 center = (a + b + c) / 3.0f;
-		if (n.Dot(center) > 0.0f)
+		Vector3 tri_center = (a + b + c) / 3.0f;
+		if (n.Dot(tri_center) > 0.0f)
 		{
-			// Flip triangle to keep the rendered side on the outside of the planet.
 			(b, c) = (c, b);
 		}
 
-		verts.Add(a);
-		verts.Add(b);
-		verts.Add(c);
+		// Displace by terrain noise so same 3D position always gets same height at every LOD.
+		verts.Add(displaceVertex(a));
+		verts.Add(displaceVertex(b));
+		verts.Add(displaceVertex(c));
+	}
+
+	/// <summary>
+	/// Displace a point on the sphere by planet terrain noise. Same position => same result at any LOD.
+	/// </summary>
+	private Vector3 displaceVertex(Vector3 sphere_pos)
+	{
+		if (planet == null) return sphere_pos;
+		float h = planet.getTerrainDisplacement(sphere_pos);
+		return sphere_pos + sphere_pos.Normalized() * h;
 	}
 }
