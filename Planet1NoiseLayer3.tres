@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="PlanetTerrainLayer" format=3 uid="uid://dshii303il7hm"]
+
+[ext_resource type="Script" uid="uid://8f53b82mr4t1" path="res://scripts/PlanetTerrainLayer.cs" id="1_layer3"]
+
+[resource]
+script = ExtResource("1_layer3")
+seed = 200
+frequency = 4.0
+amplitude = 1.2
+metadata/_custom_type_script = "uid://8f53b82mr4t1"

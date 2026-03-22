@@ -65,58 +65,60 @@ public partial class TriTree : Node3D
 
     public Vector3 getRootCenter() => (root_va + root_vb + root_vc) / 3.0f;
 
-    public override void _Process(double delta)
-    {
-        if (Engine.IsEditorHint() || root == null) return;
+    // public override void _Process(double delta)
+    // {
+    //     if (Engine.IsEditorHint() || root == null) return;
 
-        var camera = GetViewport().GetCamera3D();
-        if (camera == null) return;
+    //     var camera = GetViewport().GetCamera3D();
+    //     if (camera == null) return;
 
-        updateLOD(root, camera.GlobalPosition);
-    }
+    //     updateLOD(root, camera.GlobalPosition);
+    // }
 
-    // -------------------------------------------------------------------------
-    // LOD tree traversal
-    // -------------------------------------------------------------------------
+    // // -------------------------------------------------------------------------
+    // // LOD tree traversal
+    // // -------------------------------------------------------------------------
 
-    private void updateLOD(TriNode node, Vector3 target_pos)
-    {
-        // Split distance halves at each depth level so deeper triangles only
-        // subdivide when the camera is very close.
-        float split_dist = sphere_radius * lod_distance / Mathf.Pow(2.0f, node.depth);
-        float dist       = target_pos.DistanceTo(node.mesh_center);
+    // private void updateLOD(TriNode node, Vector3 target_pos)
+    // {
+    //     // Split distance halves at each depth level so deeper triangles only
+    //     // subdivide when the camera is very close.
+    //     float split_dist = sphere_radius * lod_distance / Mathf.Pow(2.0f, node.depth);
+    //     float dist = target_pos.DistanceTo(node.mesh_center);
 
-        if (dist < split_dist && node.depth < max_depth)
-        {
-            if (node.is_leaf) split(node);
-            foreach (var child in node.children)
-                updateLOD(child, target_pos);
-        }
-        else
-        {
-            if (!node.is_leaf) merge(node);
-        }
-    }
+    //     if (dist < split_dist && node.depth < max_depth)
+    //     {
+    //         if (node.is_leaf) split(node);
+    //         foreach (var child in node.children)
+    //             updateLOD(child, target_pos);
+    //     }
+    //     else
+    //     {
+    //         if (!node.is_leaf) merge(node);
+    //     }
 
-    private void split(TriNode node)
-    {
-        if (node.mesh_instance != null)
-            node.mesh_instance.Visible = false;
+    //     Name = dist.ToString();
+    // }
 
-        // Midpoints projected back onto the sphere so subdivision stays spherical
-        Vector3 mid_ab = projectToSphere((node.va + node.vb) * 0.5f);
-        Vector3 mid_bc = projectToSphere((node.vb + node.vc) * 0.5f);
-        Vector3 mid_ca = projectToSphere((node.vc + node.va) * 0.5f);
+    // private void split(TriNode node)
+    // {
+    //     if (node.mesh_instance != null)
+    //         node.mesh_instance.Visible = false;
 
-        // Triforce pattern — 3 corner children + 1 centre child
-        node.children = new TriNode[]
-        {
-            spawnChild(node.va, mid_ab, mid_ca, node.depth + 1),
-            spawnChild(mid_ab, node.vb, mid_bc, node.depth + 1),
-            spawnChild(mid_ca, mid_bc, node.vc, node.depth + 1),
-            spawnChild(mid_ab, mid_bc, mid_ca, node.depth + 1),
-        };
-    }
+    //     // Midpoints projected back onto the sphere so subdivision stays spherical
+    //     Vector3 mid_ab = projectToSphere((node.va + node.vb) * 0.5f);
+    //     Vector3 mid_bc = projectToSphere((node.vb + node.vc) * 0.5f);
+    //     Vector3 mid_ca = projectToSphere((node.vc + node.va) * 0.5f);
+
+    //     // Triforce pattern — 3 corner children + 1 centre child
+    //     node.children = new TriNode[]
+    //     {
+    //         spawnChild(node.va, mid_ab, mid_ca, node.depth + 1),
+    //         spawnChild(mid_ab, node.vb, mid_bc, node.depth + 1),
+    //         spawnChild(mid_ca, mid_bc, node.vc, node.depth + 1),
+    //         spawnChild(mid_ab, mid_bc, mid_ca, node.depth + 1),
+    //     };
+    // }
 
     private void merge(TriNode node)
     {

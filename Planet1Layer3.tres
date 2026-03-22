@@ -4,6 +4,6 @@
 
 [resource]
 script = ExtResource("1_oeyaw")
-distance = 25.0
+distance = 2
 divisions = 2
 metadata/_custom_type_script = "uid://bpjlu0kbl8q6c"

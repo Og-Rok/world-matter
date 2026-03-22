@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="WorldPatchNoise" format=3 uid="uid://gk0bri8fp508"]
+
+[ext_resource type="Script" uid="uid://xtu7p8lbnu35" path="res://scripts/WorldPatchNoise.cs" id="1_0cy8h"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_0cy8h"]
+frequency = 1.0
+
+[resource]
+script = ExtResource("1_0cy8h")
+noise = SubResource("FastNoiseLite_0cy8h")
+amplitude = 10.0
+metadata/_custom_type_script = "uid://xtu7p8lbnu35"

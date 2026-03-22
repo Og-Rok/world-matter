@@ -1,0 +1,110 @@
+[gd_scene format=4 uid="uid://ejb7on3fa7vv"]
+
+[ext_resource type="Script" uid="uid://cc8ts8jwdsb8x" path="res://scripts/World.cs" id="1_f3sb7"]
+[ext_resource type="Script" uid="uid://vrj0frnlajqh" path="res://scripts/WorldPatch.cs" id="2_fj7yv"]
+[ext_resource type="Script" uid="uid://xtu7p8lbnu35" path="res://scripts/WorldPatchNoise.cs" id="3_036b0"]
+[ext_resource type="Resource" uid="uid://gk0bri8fp508" path="res://World1Layer1.tres" id="4_dwbse"]
+[ext_resource type="Script" uid="uid://0e3dvg7pk8d" path="res://scripts/CameraController.cs" id="6_dwbse"]
+[ext_resource type="Shader" uid="uid://qbgn2pjqu5nd" path="res://WorldTerrainSurface.gdshader" id="terrain_surface_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_aqk2v"]
+render_priority = 0
+shader = ExtResource("terrain_surface_shader")
+shader_parameter/dark_pink = Color(0.55, 0.1, 0.35, 1)
+shader_parameter/grey = Color(0.55, 0.55, 0.55, 1)
+shader_parameter/square_scale = 64.0
+shader_parameter/shader_noise_height = 10.0
+shader_parameter/shader_noise_frequency = 64.0
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_dwbse"]
+_surfaces = [{
+"aabb": AABB(866.0254, -1060.6602, -1060.6602, 633.9746, 1060.6602, 1060.6602),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("oIFYRKCBWMSggVjEAIC7RAAAAAAAAAAAIJWERAAAAAAglYTEoIFYRKCBWMSggVjEIJWERCCVhMQAAAAAAIC7RAAAAAAAAAAAVNWqKv9//5////9//3//v////7+qqqmqVNWqKv9//5//v/8/VFWpqv///3//f/+/")
+}]
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_pkg7o"]
+_surfaces = [{
+"aabb": AABB(866.0254, 0, -1060.6602, 633.9746, 1060.6602, 1060.6602),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("IJWERAAAAAAglYTEIJWERCCVhEQAAAAAoIFYRKCBWESggVjEIJWERAAAAAAglYTEAIC7RAAAAAAAAAAAIJWERCCVhEQAAAAA////v6qqqar/v/+/VFVU1VTVVNUAAACA////v6qqqar///9//3//v/+//79UVVTV")
+}]
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_gbfbk"]
+_surfaces = [{
+"aabb": AABB(866.0254, -1060.6602, 0, 633.9746, 1060.6602, 1060.6602),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("IJWERCCVhMQAAAAAIJWERAAAAAAglYREAIC7RAAAAAAAAAAAIJWERCCVhMQAAAAAoIFYRKCBWMSggVhEIJWERAAAAAAglYRE/7//P1RVqar/v/9/VFWpqv///3//f/+//7//P1RVqaqqqlRV/z//n/+//39UVamq")
+}]
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_ioo17"]
+_surfaces = [{
+"aabb": AABB(866.0254, 0, 0, 633.9746, 1060.6602, 1060.6602),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("AIC7RAAAAAAAAAAAoIFYRKCBWESggVhEIJWERCCVhEQAAAAAAIC7RAAAAAAAAAAAIJWERAAAAAAglYREoIFYRKCBWESggVhE////f/9//7+qqqqq/z//v/+//79UVVTV////f/9//7//v/9/VFWpqqqqqqr/P/+/")
+}]
+
+[node name="World" type="Node3D" unique_id=93050490]
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=613897347]
+transform = Transform3D(1, 0, 0, 0, 0.25881907, 0.9659258, 0, -0.9659258, 0.25881907, 2200, 0, 0)
+script = ExtResource("6_dwbse")
+debug_wireframe_viewport = true
+
+[node name="World1" type="Node3D" parent="." unique_id=1095462825]
+script = ExtResource("1_f3sb7")
+radius = 1500.0
+patch_material = SubResource("ShaderMaterial_aqk2v")
+lod_split_distances = PackedFloat32Array(1000, 850, 700, 550, 400, 250)
+lod_mesh_subdivisions = PackedInt32Array(0, 0, 0, 0, 0, 0)
+noises = Array[ExtResource("3_036b0")]([ExtResource("4_dwbse")])
+terrain_height_scale = 0.0
+shader_noise_height = 10.0
+shader_noise_frequency = 64.0
+
+[node name="Patch_0" type="Node3D" parent="World1" unique_id=102927124]
+script = ExtResource("2_fj7yv")
+
+[node name="Mesh" type="MeshInstance3D" parent="World1/Patch_0" unique_id=1309121886]
+material_override = SubResource("ShaderMaterial_aqk2v")
+mesh = SubResource("ArrayMesh_dwbse")
+
+[node name="Patch_1" type="Node3D" parent="World1" unique_id=1786837511]
+script = ExtResource("2_fj7yv")
+
+[node name="Mesh" type="MeshInstance3D" parent="World1/Patch_1" unique_id=259290431]
+material_override = SubResource("ShaderMaterial_aqk2v")
+mesh = SubResource("ArrayMesh_pkg7o")
+
+[node name="Patch_2" type="Node3D" parent="World1" unique_id=1332119998]
+script = ExtResource("2_fj7yv")
+
+[node name="Mesh" type="MeshInstance3D" parent="World1/Patch_2" unique_id=352102873]
+material_override = SubResource("ShaderMaterial_aqk2v")
+mesh = SubResource("ArrayMesh_gbfbk")
+
+[node name="Patch_3" type="Node3D" parent="World1" unique_id=1804519874]
+script = ExtResource("2_fj7yv")
+
+[node name="Mesh" type="MeshInstance3D" parent="World1/Patch_3" unique_id=413634610]
+material_override = SubResource("ShaderMaterial_aqk2v")
+mesh = SubResource("ArrayMesh_ioo17")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1589214619]
+transform = Transform3D(1, 0, 0, 0, 0.25881907, 0.9659258, 0, -0.9659258, 0.25881907, 0, 217.91805, 0)

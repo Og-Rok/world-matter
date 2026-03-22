@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="PlanetTerrainLayer" format=3 uid="uid://c76shsjq6r2i"]
+
+[ext_resource type="Script" uid="uid://8f53b82mr4t1" path="res://scripts/PlanetTerrainLayer.cs" id="1_atupq"]
+
+[resource]
+script = ExtResource("1_atupq")
+frequency = 2.0
+amplitude = 5.0
+fractal_type = 2
+fractal_octaves = 2
+fractal_lacunarity = 1.5
+fractal_gain = 1.0
+metadata/_custom_type_script = "uid://8f53b82mr4t1"

@@ -19,18 +19,15 @@ public partial class Planet : Node3D
     }
 
     [ExportGroup("Terrain noise")]
-    [Export] public int terrain_noise_seed = 0;
-    [Export] public float terrain_noise_frequency = 1.0f;
     [Export] public float terrain_height_scale = 2.0f;
-    [Export] public int terrain_fractal_octaves = 4;
-    [Export] public float terrain_fractal_lacunarity = 2.0f;
-    [Export] public float terrain_fractal_gain = 0.5f;
+    /// <summary>Each layer uses its own FastNoiseLite (configure in the layer resource). Displacement = height_scale * sum of layer amplitude * layer_noise(unit).</summary>
+    [Export] public Array<PlanetTerrainLayer> terrain_layers = new Array<PlanetTerrainLayer>();
+    [Export] public int terrain_color_noise_seed = 12345;
 
     public enum TerrainColorMode { Grid, ColourBlobs }
     [Export] public TerrainColorMode terrain_color_mode = TerrainColorMode.Grid;
     [Export] public float terrain_color_grid_scale = 10.0f;
 
-    private FastNoiseLite terrain_noise;
     private FastNoiseLite color_noise;
     private Vector3[] point_positions;
     private List<(int a, int b, int c)> triangles;
@@ -212,15 +209,21 @@ public partial class Planet : Node3D
 
     /// <summary>
     /// Returns terrain height displacement (in local space) for a point on the planet.
-    /// Sampling uses 3D position so the same spot always gets the same value at every LOD.
+    /// Each layer uses its own FastNoiseLite. Same position => same value at every LOD.
     /// </summary>
     public float getTerrainDisplacement(Vector3 pos_in_planet_space)
     {
-        ensureTerrainNoise();
+        if (terrain_layers == null || terrain_layers.Count == 0)
+            return 0.0f;
         Vector3 unit = pos_in_planet_space.Normalized();
-        float scale = terrain_noise_frequency;
-        float n = terrain_noise.GetNoise3D(unit.X * scale, unit.Y * scale, unit.Z * scale);
-        return n * terrain_height_scale;
+        float total = 0.0f;
+        for (int i = 0; i < terrain_layers.Count; i++)
+        {
+            PlanetTerrainLayer layer = getTerrainLayerAt(i);
+            if (layer == null) continue;
+            total += layer.getNoise3D(unit.X, unit.Y, unit.Z);
+        }
+        return total * terrain_height_scale;
     }
 
     /// <summary>
@@ -255,22 +258,33 @@ public partial class Planet : Node3D
     {
         if (color_noise != null) return;
         color_noise = new FastNoiseLite();
-        color_noise.Seed = terrain_noise_seed + 12345;
+        color_noise.Seed = terrain_color_noise_seed;
         color_noise.NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin;
         color_noise.Frequency = 0.8f;
     }
 
-    private void ensureTerrainNoise()
+    private PlanetTerrainLayer getTerrainLayerAt(int index)
     {
-        if (terrain_noise != null) return;
-        terrain_noise = new FastNoiseLite();
-        terrain_noise.Seed = terrain_noise_seed;
-        terrain_noise.NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin;
-        terrain_noise.FractalType = FastNoiseLite.FractalTypeEnum.Fbm;
-        terrain_noise.Frequency = 1.0f;
-        terrain_noise.FractalOctaves = terrain_fractal_octaves;
-        terrain_noise.FractalLacunarity = terrain_fractal_lacunarity;
-        terrain_noise.FractalGain = terrain_fractal_gain;
+        if (terrain_layers == null || index < 0 || index >= terrain_layers.Count)
+            return null;
+        Variant v = (Variant)terrain_layers[index];
+        Resource r = v.As<Resource>();
+        PlanetTerrainLayer layer = r as PlanetTerrainLayer;
+        if (layer != null) return layer;
+        // Godot may load as base Resource; copy exported props into a new layer
+        layer = new PlanetTerrainLayer();
+        if (r != null)
+        {
+            if (r.Get("seed").VariantType != Variant.Type.Nil) layer.seed = r.Get("seed").As<int>();
+            if (r.Get("frequency").VariantType != Variant.Type.Nil) layer.frequency = r.Get("frequency").As<float>();
+            if (r.Get("amplitude").VariantType != Variant.Type.Nil) layer.amplitude = r.Get("amplitude").As<float>();
+            if (r.Get("noise_type").VariantType != Variant.Type.Nil) layer.noise_type = (FastNoiseLite.NoiseTypeEnum)r.Get("noise_type").As<int>();
+            if (r.Get("fractal_type").VariantType != Variant.Type.Nil) layer.fractal_type = (FastNoiseLite.FractalTypeEnum)r.Get("fractal_type").As<int>();
+            if (r.Get("fractal_octaves").VariantType != Variant.Type.Nil) layer.fractal_octaves = r.Get("fractal_octaves").As<int>();
+            if (r.Get("fractal_lacunarity").VariantType != Variant.Type.Nil) layer.fractal_lacunarity = r.Get("fractal_lacunarity").As<float>();
+            if (r.Get("fractal_gain").VariantType != Variant.Type.Nil) layer.fractal_gain = r.Get("fractal_gain").As<float>();
+        }
+        return layer;
     }
 
 }

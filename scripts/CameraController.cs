@@ -6,6 +6,8 @@ public partial class CameraController : Camera3D
     [Export] public float move_speed       = 10.0f;
     [Export] public float mouse_sensitivity = 0.002f;
     [Export] public float roll_speed       = 1.5f;
+    /// <summary>Very expensive on large meshes; disable for normal play.</summary>
+    [Export] public bool debug_wireframe_viewport = false;
 
     public override void _EnterTree()
     {
@@ -35,7 +37,10 @@ public partial class CameraController : Camera3D
 
     public override void _Process(double delta)
     {
-        // GetViewport().DebugDraw = Viewport.DebugDrawEnum.Wireframe;
+        GetViewport().DebugDraw = debug_wireframe_viewport
+            ? Viewport.DebugDrawEnum.Wireframe
+            : Viewport.DebugDrawEnum.Disabled;
+
         if (Input.MouseMode != Input.MouseModeEnum.Captured)
         {
             return;
@@ -55,7 +60,7 @@ public partial class CameraController : Camera3D
         if (Input.IsKeyPressed(Key.Q)) move_dir -= Transform.Basis.Y;
 
         if (move_dir.LengthSquared() > 0)
-            Position += move_dir.Normalized() * move_speed * dt;
+            Position += move_dir.Normalized() * move_speed * dt * (Input.IsKeyPressed(Key.Shift) ? 10.0f : 1.0f);
 
         // Roll around the camera's own forward axis
         if (Input.IsKeyPressed(Key.X))
