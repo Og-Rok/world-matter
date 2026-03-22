@@ -1,6 +1,7 @@
 using Godot;
 using Godot.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 [Tool]
 public partial class World : Node3D
@@ -43,6 +44,23 @@ public partial class World : Node3D
 
     private readonly List<WorldPatchNoise> resolved_noise_layers = new List<WorldPatchNoise>();
 
+    /// <summary>True while initial world regeneration is baking meshes off-thread (patches should not start competing leaf bakes).</summary>
+    public bool is_regenerating_baking { get; private set; }
+
+    private int regeneration_sequence;
+
+    private struct InitialPatchGeometry
+    {
+        public Vector3 p00;
+        public Vector3 p10;
+        public Vector3 p11;
+        public Vector3 p01;
+        public Vector2 uv00;
+        public Vector2 uv10;
+        public Vector2 uv11;
+        public Vector2 uv01;
+    }
+
     public override void _Ready()
     {
         max_lod_depth = Mathf.Max(max_lod_depth, lod_split_distances.Length);
@@ -63,8 +81,92 @@ public partial class World : Node3D
 
     private void regenerate()
     {
-        GD.Print("Regenerating world");
+        regeneration_sequence++;
+        int regen_id = regeneration_sequence;
+        is_regenerating_baking = true;
+
         clearChildren();
+
+        List<InitialPatchGeometry> geometries = buildInitialPatchGeometryList();
+        TerrainNoiseSnapshot[] noise_snapshots = captureTerrainNoiseSnapshots();
+        int base_subdivisions = getMeshSubdivisionCountForDepth(0, float.MaxValue);
+
+        for (int i = 0; i < geometries.Count; i++)
+        {
+            InitialPatchGeometry g = geometries[i];
+            WorldPatch patch_node = new WorldPatch();
+            patch_node.Name = "Patch_" + i;
+            patch_node.initPatch(
+                this,
+                patch_material,
+                g.p00,
+                g.p10,
+                g.p11,
+                g.p01,
+                g.uv00,
+                g.uv10,
+                g.uv11,
+                g.uv01,
+                0);
+            AddChild(patch_node);
+            SceneTree tree = GetTree();
+            if (tree != null && tree.EditedSceneRoot != null)
+            {
+                patch_node.Owner = tree.EditedSceneRoot;
+            }
+        }
+
+        InitialPatchGeometry[] geometry_array = geometries.ToArray();
+        float height_scale = terrain_height_scale;
+        int count = geometry_array.Length;
+
+        _ = Task.Run(() =>
+        {
+            var results = new WorldMeshBaker.PatchBakeResult[count];
+            for (int i = 0; i < count; i++)
+            {
+                InitialPatchGeometry g = geometry_array[i];
+                results[i] = WorldMeshBaker.bakeLeafPatch(
+                    g.p00,
+                    g.p10,
+                    g.p11,
+                    g.p01,
+                    g.uv00,
+                    g.uv10,
+                    g.uv11,
+                    g.uv01,
+                    base_subdivisions,
+                    noise_snapshots,
+                    height_scale);
+            }
+
+            Callable.From(() => finishRegenerationApplyMeshes(regen_id, results)).CallDeferred();
+        });
+    }
+
+    private void finishRegenerationApplyMeshes(int regen_id, WorldMeshBaker.PatchBakeResult[] results)
+    {
+        if (regen_id != regeneration_sequence)
+        {
+            return;
+        }
+
+        Godot.Collections.Array<Node> children = GetChildren();
+        int n = Mathf.Min(children.Count, results.Length);
+        for (int i = 0; i < n; i++)
+        {
+            if (children[i] is WorldPatch wp && results[i] != null)
+            {
+                wp.applyBakedLeafMesh(results[i]);
+            }
+        }
+
+        is_regenerating_baking = false;
+    }
+
+    private List<InitialPatchGeometry> buildInitialPatchGeometryList()
+    {
+        var list = new List<InitialPatchGeometry>(24);
 
         Vector3[] face_normals = new Vector3[]
         {
@@ -76,29 +178,24 @@ public partial class World : Node3D
             Vector3.Back
         };
 
-        int patch_index = 0;
         for (int face_index = 0; face_index < face_normals.Length; face_index++)
         {
             Vector3 face_normal = face_normals[face_index];
             Vector3 axis_u = getFaceAxisU(face_normal);
             Vector3 axis_v = getFaceAxisV(face_normal, axis_u);
-            createFacePatches(face_normal, axis_u, axis_v, ref patch_index);
-
-            break;
+            appendFacePatchGeometries(face_normal, axis_u, axis_v, list);
         }
+
+        return list;
     }
 
-    private void clearChildren()
+    private void appendFacePatchGeometries(
+        Vector3 face_normal,
+        Vector3 axis_u,
+        Vector3 axis_v,
+        List<InitialPatchGeometry> list)
     {
-        foreach (Node child in GetChildren())
-        {
-            child.Free();
-        }
-    }
-
-    private void createFacePatches(Vector3 face_normal, Vector3 axis_u, Vector3 axis_v, ref int patch_index)
-    {
-        const int cells_per_axis = 2; // 2x2 per face => 4 patches per face => 24 total patches.
+        const int cells_per_axis = 2;
         float step = 2.0f / cells_per_axis;
 
         for (int y = 0; y < cells_per_axis; y++)
@@ -110,29 +207,61 @@ public partial class World : Node3D
                 float v0 = -1.0f + (y * step);
                 float v1 = -1.0f + ((y + 1) * step);
 
-                Vector3 p00 = cubeToSphere(face_normal + axis_u * u0 + axis_v * v0);
-                Vector3 p10 = cubeToSphere(face_normal + axis_u * u1 + axis_v * v0);
-                Vector3 p11 = cubeToSphere(face_normal + axis_u * u1 + axis_v * v1);
-                Vector3 p01 = cubeToSphere(face_normal + axis_u * u0 + axis_v * v1);
-
-                WorldPatch patch_node = new WorldPatch();
-                patch_node.Name = "Patch_" + patch_index;
-                patch_node.initPatch(
-                    this,
-                    patch_material,
-                    p00,
-                    p10,
-                    p11,
-                    p01,
-                    new Vector2(0, 0),
-                    new Vector2(1, 0),
-                    new Vector2(1, 1),
-                    new Vector2(0, 1),
-                    0);
-                AddChild(patch_node);
-                patch_node.Owner = GetTree().EditedSceneRoot;
-                patch_index++;
+                list.Add(new InitialPatchGeometry
+                {
+                    p00 = cubeToSphere(face_normal + axis_u * u0 + axis_v * v0),
+                    p10 = cubeToSphere(face_normal + axis_u * u1 + axis_v * v0),
+                    p11 = cubeToSphere(face_normal + axis_u * u1 + axis_v * v1),
+                    p01 = cubeToSphere(face_normal + axis_u * u0 + axis_v * v1),
+                    uv00 = new Vector2(0, 0),
+                    uv10 = new Vector2(1, 0),
+                    uv11 = new Vector2(1, 1),
+                    uv01 = new Vector2(0, 1)
+                });
             }
+        }
+    }
+
+    /// <summary>Call from main thread only (touches noise resources).</summary>
+    public TerrainNoiseSnapshot[] captureTerrainNoiseSnapshots()
+    {
+        if (resolved_noise_layers.Count == 0)
+        {
+            return System.Array.Empty<TerrainNoiseSnapshot>();
+        }
+
+        var snapshots = new TerrainNoiseSnapshot[resolved_noise_layers.Count];
+        int write = 0;
+        for (int i = 0; i < resolved_noise_layers.Count; i++)
+        {
+            WorldPatchNoise layer = resolved_noise_layers[i];
+            if (layer == null)
+            {
+                continue;
+            }
+
+            snapshots[write++] = layer.captureSnapshotForBake();
+        }
+
+        if (write == resolved_noise_layers.Count)
+        {
+            return snapshots;
+        }
+
+        var trimmed = new TerrainNoiseSnapshot[write];
+        for (int i = 0; i < write; i++)
+        {
+            trimmed[i] = snapshots[i];
+        }
+
+        return trimmed;
+    }
+
+    private void clearChildren()
+    {
+        foreach (Node child in GetChildren())
+        {
+            child.Free();
         }
     }
 

@@ -35,4 +35,26 @@ public partial class WorldPatchNoise : Resource
         noise.FractalType = FastNoiseLite.FractalTypeEnum.Fbm;
         noise.FractalOctaves = 4;
     }
+
+    /// <summary>
+    /// Snapshot for background mesh baking (main thread only). Matches <see cref="sampleNoise"/> layering; displacement uses thread-safe FBM in <see cref="WorldTerrainMath"/>.
+    /// </summary>
+    public TerrainNoiseSnapshot captureSnapshotForBake()
+    {
+        ensureNoise();
+        if (noise == null)
+        {
+            return default;
+        }
+
+        return new TerrainNoiseSnapshot
+        {
+            amplitude = amplitude,
+            seed = noise.Seed,
+            frequency = noise.Frequency,
+            fractal_octaves = noise.FractalOctaves,
+            fractal_gain = noise.FractalGain,
+            fractal_lacunarity = noise.FractalLacunarity
+        };
+    }
 }

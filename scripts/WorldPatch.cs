@@ -1,5 +1,7 @@
 using Godot;
+using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 /// <summary>
 /// Sphere quad patch: either a leaf mesh or four child patches. LOD uses distance from
@@ -22,6 +24,8 @@ public partial class WorldPatch : Node3D
     private MeshInstance3D mesh_instance;
     private double lod_time_accum;
     private int last_built_mesh_subdivisions = -1;
+    private int leaf_bake_sequence;
+    private bool mesh_bake_pending;
 
     public void initPatch(
         World world_ref,
@@ -51,6 +55,11 @@ public partial class WorldPatch : Node3D
 
     public override void _Ready()
     {
+        if (Engine.IsEditorHint() && world != null && world.is_regenerating_baking)
+        {
+            return;
+        }
+
         if (Engine.IsEditorHint())
         {
             ensureLeafMesh();
@@ -60,6 +69,11 @@ public partial class WorldPatch : Node3D
     public override void _PhysicsProcess(double delta)
     {
         if (world == null)
+        {
+            return;
+        }
+
+        if (world.is_regenerating_baking)
         {
             return;
         }
@@ -215,7 +229,12 @@ public partial class WorldPatch : Node3D
 
     private void ensureLeafMesh()
     {
-        if (GetChildCount() > 0)
+        if (hasWorldPatchChildren())
+        {
+            return;
+        }
+
+        if (mesh_bake_pending)
         {
             return;
         }
@@ -229,11 +248,88 @@ public partial class WorldPatch : Node3D
 
         freeLeafMesh();
 
-        ArrayMesh mesh = world.buildPatchMesh(p00, p10, p11, p01, uv00, uv10, uv11, uv01);
-        subdivideTriangleMesh(mesh, desired_subdivisions);
-        applyTerrainDisplacement(mesh, world);
+        TerrainNoiseSnapshot[] noise_snapshots = world.captureTerrainNoiseSnapshots();
+        float terrain_scale = world.terrain_height_scale;
 
-        last_built_mesh_subdivisions = desired_subdivisions;
+        if (Engine.IsEditorHint())
+        {
+            WorldMeshBaker.PatchBakeResult baked = WorldMeshBaker.bakeLeafPatch(
+                p00,
+                p10,
+                p11,
+                p01,
+                uv00,
+                uv10,
+                uv11,
+                uv01,
+                desired_subdivisions,
+                noise_snapshots,
+                terrain_scale);
+            applyBakedLeafMesh(baked);
+            return;
+        }
+
+        mesh_bake_pending = true;
+        leaf_bake_sequence++;
+        int bake_id = leaf_bake_sequence;
+        Vector3 c00 = p00;
+        Vector3 c10 = p10;
+        Vector3 c11 = p11;
+        Vector3 c01 = p01;
+        Vector2 u00 = uv00;
+        Vector2 u10 = uv10;
+        Vector2 u11 = uv11;
+        Vector2 u01 = uv01;
+        int subdiv = desired_subdivisions;
+
+        _ = Task.Run(() =>
+        {
+            WorldMeshBaker.PatchBakeResult baked = null;
+            try
+            {
+                baked = WorldMeshBaker.bakeLeafPatch(
+                    c00,
+                    c10,
+                    c11,
+                    c01,
+                    u00,
+                    u10,
+                    u11,
+                    u01,
+                    subdiv,
+                    noise_snapshots,
+                    terrain_scale);
+            }
+            catch (Exception ex)
+            {
+                GD.PushError("WorldPatch mesh bake failed: " + ex.Message);
+            }
+
+            int captured_id = bake_id;
+            Callable.From(() => completeAsyncLeafMeshBake(captured_id, baked, subdiv)).CallDeferred();
+        });
+    }
+
+    /// <summary>Main thread only. Replaces any existing leaf mesh.</summary>
+    public void applyBakedLeafMesh(WorldMeshBaker.PatchBakeResult baked)
+    {
+        if (baked == null)
+        {
+            return;
+        }
+
+        freeLeafMesh();
+
+        var arrays = new Godot.Collections.Array();
+        arrays.Resize((int)Mesh.ArrayType.Max);
+        arrays[(int)Mesh.ArrayType.Vertex] = baked.vertices;
+        arrays[(int)Mesh.ArrayType.Normal] = baked.normals;
+        arrays[(int)Mesh.ArrayType.TexUV] = baked.uvs;
+
+        ArrayMesh mesh = new ArrayMesh();
+        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+
+        last_built_mesh_subdivisions = baked.subdivisions_used;
 
         mesh_instance = new MeshInstance3D();
         mesh_instance.Name = "Mesh";
@@ -247,6 +343,40 @@ public partial class WorldPatch : Node3D
         }
     }
 
+    private void completeAsyncLeafMeshBake(int bake_id, WorldMeshBaker.PatchBakeResult baked, int subdivisions_built)
+    {
+        mesh_bake_pending = false;
+
+        if (!IsInstanceValid(this))
+        {
+            return;
+        }
+
+        if (world == null || !IsInstanceValid(world))
+        {
+            return;
+        }
+
+        if (bake_id != leaf_bake_sequence)
+        {
+            return;
+        }
+
+        if (hasWorldPatchChildren())
+        {
+            return;
+        }
+
+        float distance_for_mesh = getDistanceToCamera();
+        int desired_now = world.getMeshSubdivisionCountForDepth(depth, distance_for_mesh);
+        if (desired_now != subdivisions_built)
+        {
+            return;
+        }
+
+        applyBakedLeafMesh(baked);
+    }
+
     private static Vector3 midpointOnSphere(Vector3 a, Vector3 b)
     {
         Vector3 midpoint = (a + b) * 0.5f;
@@ -257,146 +387,5 @@ public partial class WorldPatch : Node3D
         }
 
         return midpoint.Normalized() * sphere_radius;
-    }
-
-    /// <summary>
-    /// Each pass splits every triangle into 4 (midpoints on sphere), same as former mesh-only LOD.
-    /// </summary>
-    private static void subdivideTriangleMesh(ArrayMesh mesh, int subdivisions)
-    {
-        if (subdivisions <= 0)
-        {
-            return;
-        }
-
-        for (int pass = 0; pass < subdivisions; pass++)
-        {
-            if (mesh.GetSurfaceCount() == 0)
-            {
-                return;
-            }
-
-            var arrays = mesh.SurfaceGetArrays(0);
-            Vector3[] vertices = arrays[(int)Mesh.ArrayType.Vertex].As<Vector3[]>();
-            Vector2[] uvs = arrays[(int)Mesh.ArrayType.TexUV].As<Vector2[]>();
-
-            List<Vector3> new_vertices = new List<Vector3>();
-            List<Vector2> new_uvs = new List<Vector2>();
-
-            for (int vertex_index = 0; vertex_index < vertices.Length; vertex_index += 3)
-            {
-                Vector3 a = vertices[vertex_index];
-                Vector3 b = vertices[vertex_index + 1];
-                Vector3 c = vertices[vertex_index + 2];
-
-                Vector2 uv_a = getUvAt(uvs, vertex_index);
-                Vector2 uv_b = getUvAt(uvs, vertex_index + 1);
-                Vector2 uv_c = getUvAt(uvs, vertex_index + 2);
-
-                Vector3 ab = midpointOnSphere(a, b);
-                Vector3 bc = midpointOnSphere(b, c);
-                Vector3 ca = midpointOnSphere(c, a);
-
-                Vector2 uv_ab = (uv_a + uv_b) * 0.5f;
-                Vector2 uv_bc = (uv_b + uv_c) * 0.5f;
-                Vector2 uv_ca = (uv_c + uv_a) * 0.5f;
-
-                addSubdividedTriangle(new_vertices, new_uvs, a, ab, ca, uv_a, uv_ab, uv_ca);
-                addSubdividedTriangle(new_vertices, new_uvs, ab, b, bc, uv_ab, uv_b, uv_bc);
-                addSubdividedTriangle(new_vertices, new_uvs, ca, bc, c, uv_ca, uv_bc, uv_c);
-                addSubdividedTriangle(new_vertices, new_uvs, ab, bc, ca, uv_ab, uv_bc, uv_ca);
-            }
-
-            mesh.ClearSurfaces();
-
-            Vector3[] normal_array = new Vector3[new_vertices.Count];
-            for (int n = 0; n < new_vertices.Count; n++)
-            {
-                normal_array[n] = new_vertices[n].Normalized();
-            }
-
-            var new_arrays = new Godot.Collections.Array();
-            new_arrays.Resize((int)Mesh.ArrayType.Max);
-            new_arrays[(int)Mesh.ArrayType.Vertex] = new_vertices.ToArray();
-            new_arrays[(int)Mesh.ArrayType.Normal] = normal_array;
-            new_arrays[(int)Mesh.ArrayType.TexUV] = new_uvs.ToArray();
-            mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, new_arrays);
-        }
-    }
-
-    private static Vector2 getUvAt(Vector2[] uvs, int index)
-    {
-        if (uvs == null || index < 0 || index >= uvs.Length)
-        {
-            return Vector2.Zero;
-        }
-
-        return uvs[index];
-    }
-
-    private static void addSubdividedTriangle(
-        List<Vector3> vertices,
-        List<Vector2> uvs,
-        Vector3 a,
-        Vector3 b,
-        Vector3 c,
-        Vector2 uv_a,
-        Vector2 uv_b,
-        Vector2 uv_c)
-    {
-        Vector3 normal = (b - a).Cross(c - a);
-        Vector3 center = (a + b + c) / 3.0f;
-        if (normal.Dot(center) > 0.0f)
-        {
-            (b, c) = (c, b);
-            (uv_b, uv_c) = (uv_c, uv_b);
-        }
-
-        vertices.Add(a);
-        vertices.Add(b);
-        vertices.Add(c);
-        uvs.Add(uv_a);
-        uvs.Add(uv_b);
-        uvs.Add(uv_c);
-    }
-
-    private static void applyTerrainDisplacement(ArrayMesh mesh, World world_ref)
-    {
-        if (mesh.GetSurfaceCount() == 0)
-        {
-            return;
-        }
-
-        var arrays = mesh.SurfaceGetArrays(0);
-        Vector3[] vertices = arrays[(int)Mesh.ArrayType.Vertex].As<Vector3[]>();
-        Vector2[] uvs = arrays[(int)Mesh.ArrayType.TexUV].As<Vector2[]>();
-
-        if (vertices == null || vertices.Length == 0)
-        {
-            return;
-        }
-
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            Vector3 sphere_pos = vertices[i];
-            float height = world_ref.getTerrainDisplacement(sphere_pos);
-            Vector3 radial = sphere_pos.Normalized();
-            vertices[i] = sphere_pos + radial * height;
-        }
-
-        Vector3[] normals = new Vector3[vertices.Length];
-        for (int n = 0; n < vertices.Length; n++)
-        {
-            normals[n] = vertices[n].Normalized();
-        }
-
-        var new_arrays = new Godot.Collections.Array();
-        new_arrays.Resize((int)Mesh.ArrayType.Max);
-        new_arrays[(int)Mesh.ArrayType.Vertex] = vertices;
-        new_arrays[(int)Mesh.ArrayType.Normal] = normals;
-        new_arrays[(int)Mesh.ArrayType.TexUV] = uvs;
-
-        mesh.ClearSurfaces();
-        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, new_arrays);
     }
 }
