@@ -120,9 +120,12 @@ public partial class World : Node3D
         float height_scale = terrain_height_scale;
         int count = geometry_array.Length;
 
+        int collision_subdivisions = Mathf.Max(0, base_subdivisions / 2);
+
         _ = Task.Run(() =>
         {
             var results = new WorldMeshBaker.PatchBakeResult[count];
+            var collision_results = new WorldMeshBaker.PatchBakeResult[count];
             for (int i = 0; i < count; i++)
             {
                 InitialPatchGeometry g = geometry_array[i];
@@ -138,13 +141,28 @@ public partial class World : Node3D
                     base_subdivisions,
                     noise_snapshots,
                     height_scale);
+                collision_results[i] = WorldMeshBaker.bakeLeafPatch(
+                    g.p00,
+                    g.p10,
+                    g.p11,
+                    g.p01,
+                    g.uv00,
+                    g.uv10,
+                    g.uv11,
+                    g.uv01,
+                    collision_subdivisions,
+                    noise_snapshots,
+                    height_scale);
             }
 
-            Callable.From(() => finishRegenerationApplyMeshes(regen_id, results)).CallDeferred();
+            Callable.From(() => finishRegenerationApplyMeshes(regen_id, results, collision_results)).CallDeferred();
         });
     }
 
-    private void finishRegenerationApplyMeshes(int regen_id, WorldMeshBaker.PatchBakeResult[] results)
+    private void finishRegenerationApplyMeshes(
+        int regen_id,
+        WorldMeshBaker.PatchBakeResult[] results,
+        WorldMeshBaker.PatchBakeResult[] collision_results)
     {
         if (regen_id != regeneration_sequence)
         {
@@ -157,7 +175,10 @@ public partial class World : Node3D
         {
             if (children[i] is WorldPatch wp && results[i] != null)
             {
-                wp.applyBakedLeafMesh(results[i]);
+                WorldMeshBaker.PatchBakeResult col = collision_results != null && i < collision_results.Length
+                    ? collision_results[i]
+                    : null;
+                wp.applyBakedLeafMesh(results[i], col);
             }
         }
 

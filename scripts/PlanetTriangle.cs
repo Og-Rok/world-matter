@@ -71,9 +71,9 @@ public partial class PlanetTriangle : Node3D
 		// Height of camera above planet surface at this triangle's center, measured radially
 		// from the planet center. Zero height ≈ on the surface, increasing as you move away.
 		float height = float.MaxValue;
-		if (CameraController.instance != null)
+		if (LODTracker.instance != null)
 		{
-			Vector3 cam_pos = CameraController.instance.GlobalPosition;
+			Vector3 cam_pos = LODTracker.instance.GlobalPosition;
 			height = (center + planet.GlobalPosition).DistanceTo(cam_pos);
 		}
 
@@ -129,12 +129,12 @@ public partial class PlanetTriangle : Node3D
 		// 	return;
 		// }
 		// return;
-		// if (CameraController.instance == null)
+		// if (LODTracker.instance == null)
 		// {
 		// 	return;
 		// }
 
-		// float distance = CameraController.instance.Position.DistanceTo(center);
+		// float distance = LODTracker.instance.Position.DistanceTo(center);
 
 		// if (Name == "PlanetTriangle_26")
 		// {
@@ -171,7 +171,7 @@ public partial class PlanetTriangle : Node3D
 		// 	}
 		// }
 
-		// // if (CameraController.instance != null && CameraController.instance.Position.DistanceTo(center) > (max_distance * 2))
+		// // if (LODTracker.instance != null && LODTracker.instance.Position.DistanceTo(center) > (max_distance * 2))
 		// // {
 		// // 	if (HasNode("Subdivided"))
 		// // 	{
@@ -188,7 +188,7 @@ public partial class PlanetTriangle : Node3D
 		// // 	}
 		// // }
 
-		// // if (CameraController.instance != null && CameraController.instance.Position.DistanceTo(center) < (max_distance * 2))
+		// // if (LODTracker.instance != null && LODTracker.instance.Position.DistanceTo(center) < (max_distance * 2))
 		// // {
 		// // 	if (HasNode("Mesh"))
 		// // 	{
@@ -249,20 +249,61 @@ public partial class PlanetTriangle : Node3D
 		Vector3 vb = displaceVertex(sb);
 		Vector3 vc = displaceVertex(sc);
 
-		var arrays = new Godot.Collections.Array();
-		arrays.Resize((int)Mesh.ArrayType.Max);
-		arrays[(int)Mesh.ArrayType.Vertex] = new Vector3[] { va, vc, vb };
-		arrays[(int)Mesh.ArrayType.Normal] = new Vector3[] { va.Normalized(), vc.Normalized(), vb.Normalized() };
-		arrays[(int)Mesh.ArrayType.Color] = new Color[] { vertexColor(sa), vertexColor(sc), vertexColor(sb) };
+		Godot.Collections.Array base_arrays = buildBaseTriangleArrays(va, vc, vb, sa, sc, sb);
 
 		var mesh = new ArrayMesh();
-		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
-		subdivide(mesh);
+		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, base_arrays);
+		subdivide(mesh, settings.divisions);
 
 		var instance = new MeshInstance3D { Mesh = mesh, MaterialOverride = shared_material };
 		instance.Name = "Mesh";
 		AddChild(instance);
 		instance.Owner = GetTree().EditedSceneRoot;
+
+		int collision_divisions = Mathf.Max(0, settings.divisions / 2);
+		var collision_mesh = new ArrayMesh();
+		collision_mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, buildBaseTriangleArrays(va, vc, vb, sa, sc, sb));
+		subdivide(collision_mesh, collision_divisions);
+
+		Shape3D terrain_shape = collision_mesh.CreateTrimeshShape();
+		if (terrain_shape == null)
+		{
+			Godot.Collections.Array collision_surface = collision_mesh.SurfaceGetArrays(0);
+			var collision_verts = (Vector3[])collision_surface[(int)Mesh.ArrayType.Vertex];
+			var concave_fallback = new ConcavePolygonShape3D
+			{
+				Data = collision_verts,
+				BackfaceCollision = true
+			};
+			terrain_shape = concave_fallback;
+		}
+		else if (terrain_shape is ConcavePolygonShape3D concave)
+		{
+			concave.BackfaceCollision = true;
+		}
+
+		var static_body = new StaticBody3D { Name = "TerrainCollision" };
+		var collision_shape = new CollisionShape3D { Shape = terrain_shape };
+		static_body.AddChild(collision_shape);
+		AddChild(static_body);
+		static_body.Owner = GetTree().EditedSceneRoot;
+		collision_shape.Owner = GetTree().EditedSceneRoot;
+	}
+
+	private Godot.Collections.Array buildBaseTriangleArrays(
+		Vector3 va,
+		Vector3 vc,
+		Vector3 vb,
+		Vector3 sa,
+		Vector3 sc,
+		Vector3 sb)
+	{
+		var arrays = new Godot.Collections.Array();
+		arrays.Resize((int)Mesh.ArrayType.Max);
+		arrays[(int)Mesh.ArrayType.Vertex] = new Vector3[] { va, vc, vb };
+		arrays[(int)Mesh.ArrayType.Normal] = new Vector3[] { va.Normalized(), vc.Normalized(), vb.Normalized() };
+		arrays[(int)Mesh.ArrayType.Color] = new Color[] { vertexColor(sa), vertexColor(sc), vertexColor(sb) };
+		return arrays;
 	}
 
 	private PlanetLODSettings getLodSettingsForDepth(int d)
@@ -302,12 +343,12 @@ public partial class PlanetTriangle : Node3D
 		return lod;
 	}
 
-	public void subdivide(ArrayMesh mesh)
+	public void subdivide(ArrayMesh mesh, int division_count)
 	{
-		// Subdivide all triangles in the mesh 'settings.divisions' times using barycentric subdivision.
+		// Subdivide all triangles in the mesh `division_count` times using barycentric subdivision.
 		// On each pass, replace each triangle with 4 triangles using the midpoints, projected back
 		// onto the planet sphere and with a consistent outward-facing winding.
-		for (int division = 0; division < settings.divisions; division++)
+		for (int division = 0; division < division_count; division++)
 		{
 			GD.Print("Subdividing mesh: ", division, " surfaces: ", mesh.GetSurfaceCount());
 			// Extract current surface from mesh (assume one surface)

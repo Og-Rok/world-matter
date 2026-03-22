@@ -22,6 +22,7 @@ public partial class WorldPatch : Node3D
     private Vector2 uv01;
     private int depth;
     private MeshInstance3D mesh_instance;
+    private StaticBody3D collision_body;
     private double lod_time_accum;
     private int last_built_mesh_subdivisions = -1;
     private int leaf_bake_sequence;
@@ -55,14 +56,22 @@ public partial class WorldPatch : Node3D
 
     public override void _Ready()
     {
-        if (Engine.IsEditorHint() && world != null && world.is_regenerating_baking)
+        if (Engine.IsEditorHint())
         {
+            if (world != null && !world.is_regenerating_baking)
+            {
+                ensureLeafMesh();
+            }
             return;
         }
 
-        if (Engine.IsEditorHint())
+        // In game mode, build coarse collision synchronously the instant this patch enters
+        // the scene tree. Without this, child patches created by LOD subdivision have zero
+        // collision for up to lod_update_interval_seconds (0.2 s) which is long enough for
+        // a fast-falling body to pass through the surface before the async bake fires.
+        if (world != null && !world.is_regenerating_baking)
         {
-            ensureLeafMesh();
+            buildImmediateCoarseCollision();
         }
     }
 
@@ -143,12 +152,12 @@ public partial class WorldPatch : Node3D
 
     private float getDistanceToCamera()
     {
-        if (CameraController.instance == null)
+        if (LODTracker.instance == null)
         {
             return float.MaxValue;
         }
 
-        Vector3 cam = CameraController.instance.GlobalPosition;
+        Vector3 cam = LODTracker.instance.GlobalPosition;
         Transform3D xf = GlobalTransform;
         Vector3 w00 = xf * p00;
         Vector3 w10 = xf * p10;
@@ -164,6 +173,12 @@ public partial class WorldPatch : Node3D
         {
             mesh_instance.QueueFree();
             mesh_instance = null;
+        }
+
+        if (collision_body != null && IsInstanceValid(collision_body))
+        {
+            collision_body.QueueFree();
+            collision_body = null;
         }
 
         last_built_mesh_subdivisions = -1;
@@ -246,7 +261,10 @@ public partial class WorldPatch : Node3D
             return;
         }
 
-        freeLeafMesh();
+        // Do NOT call freeLeafMesh() here. Any existing collision (coarse from _Ready or the
+        // previous bake) stays active until applyBakedLeafMesh calls freeLeafMesh() right
+        // before installing the freshly-baked result. This eliminates the gap where a falling
+        // body has no surface to land on mid-bake.
 
         TerrainNoiseSnapshot[] noise_snapshots = world.captureTerrainNoiseSnapshots();
         float terrain_scale = world.terrain_height_scale;
@@ -265,7 +283,20 @@ public partial class WorldPatch : Node3D
                 desired_subdivisions,
                 noise_snapshots,
                 terrain_scale);
-            applyBakedLeafMesh(baked);
+            int collision_subdivisions = Mathf.Max(0, desired_subdivisions / 2);
+            WorldMeshBaker.PatchBakeResult collision_baked = WorldMeshBaker.bakeLeafPatch(
+                p00,
+                p10,
+                p11,
+                p01,
+                uv00,
+                uv10,
+                uv11,
+                uv01,
+                collision_subdivisions,
+                noise_snapshots,
+                terrain_scale);
+            applyBakedLeafMesh(baked, collision_baked);
             return;
         }
 
@@ -285,6 +316,7 @@ public partial class WorldPatch : Node3D
         _ = Task.Run(() =>
         {
             WorldMeshBaker.PatchBakeResult baked = null;
+            WorldMeshBaker.PatchBakeResult collision_baked = null;
             try
             {
                 baked = WorldMeshBaker.bakeLeafPatch(
@@ -299,6 +331,19 @@ public partial class WorldPatch : Node3D
                     subdiv,
                     noise_snapshots,
                     terrain_scale);
+                int collision_subdivisions = Mathf.Max(0, subdiv / 2);
+                collision_baked = WorldMeshBaker.bakeLeafPatch(
+                    c00,
+                    c10,
+                    c11,
+                    c01,
+                    u00,
+                    u10,
+                    u11,
+                    u01,
+                    collision_subdivisions,
+                    noise_snapshots,
+                    terrain_scale);
             }
             catch (Exception ex)
             {
@@ -306,12 +351,13 @@ public partial class WorldPatch : Node3D
             }
 
             int captured_id = bake_id;
-            Callable.From(() => completeAsyncLeafMeshBake(captured_id, baked, subdiv)).CallDeferred();
+            Callable.From(() => completeAsyncLeafMeshBake(captured_id, baked, collision_baked, subdiv)).CallDeferred();
         });
     }
 
-    /// <summary>Main thread only. Replaces any existing leaf mesh.</summary>
-    public void applyBakedLeafMesh(WorldMeshBaker.PatchBakeResult baked)
+    /// <summary>Main thread only. Replaces any existing leaf mesh and collision body.</summary>
+    /// <param name="collision_baked">Lower-resolution mesh for physics; pass null to skip collision.</param>
+    public void applyBakedLeafMesh(WorldMeshBaker.PatchBakeResult baked, WorldMeshBaker.PatchBakeResult collision_baked = null)
     {
         if (baked == null)
         {
@@ -341,9 +387,29 @@ public partial class WorldPatch : Node3D
         {
             mesh_instance.Owner = tree.EditedSceneRoot;
         }
+
+        if (collision_baked != null && collision_baked.vertices != null && collision_baked.vertices.Length >= 3)
+        {
+            Shape3D terrain_shape = createTerrainTrimeshCollisionShape(
+                collision_baked.vertices,
+                collision_baked.normals);
+            var collision_shape = new CollisionShape3D { Shape = terrain_shape };
+            collision_body = new StaticBody3D { Name = "TerrainCollision" };
+            collision_body.AddChild(collision_shape);
+            AddChild(collision_body);
+            if (tree != null && tree.EditedSceneRoot != null)
+            {
+                collision_body.Owner = tree.EditedSceneRoot;
+                collision_shape.Owner = tree.EditedSceneRoot;
+            }
+        }
     }
 
-    private void completeAsyncLeafMeshBake(int bake_id, WorldMeshBaker.PatchBakeResult baked, int subdivisions_built)
+    private void completeAsyncLeafMeshBake(
+        int bake_id,
+        WorldMeshBaker.PatchBakeResult baked,
+        WorldMeshBaker.PatchBakeResult collision_baked,
+        int subdivisions_built)
     {
         mesh_bake_pending = false;
 
@@ -374,7 +440,69 @@ public partial class WorldPatch : Node3D
             return;
         }
 
-        applyBakedLeafMesh(baked);
+        applyBakedLeafMesh(baked, collision_baked);
+    }
+
+    /// <summary>
+    /// Synchronously builds a 0-subdivision (2-triangle) collision body for this patch on the
+    /// main thread. Runs in microseconds and is called from <see cref="_Ready"/> so that every
+    /// patch has physics coverage from the very first frame it exists, with no 200 ms wait.
+    /// <see cref="applyBakedLeafMesh"/> replaces this with the properly subdivided result later.
+    /// </summary>
+    private void buildImmediateCoarseCollision()
+    {
+        TerrainNoiseSnapshot[] snapshots = world.captureTerrainNoiseSnapshots();
+        WorldMeshBaker.PatchBakeResult result = WorldMeshBaker.bakeLeafPatch(
+            p00, p10, p11, p01,
+            uv00, uv10, uv11, uv01,
+            0,
+            snapshots,
+            world.terrain_height_scale);
+
+        if (result == null || result.vertices == null || result.vertices.Length < 3)
+        {
+            return;
+        }
+
+        Shape3D shape = createTerrainTrimeshCollisionShape(result.vertices, result.normals);
+        var collision_shape = new CollisionShape3D { Shape = shape };
+        collision_body = new StaticBody3D { Name = "TerrainCollision" };
+        collision_body.AddChild(collision_shape);
+        AddChild(collision_body);
+    }
+
+    /// <summary>
+    /// Builds a trimesh physics shape from baked vertices. Uses <see cref="ArrayMesh.CreateTrimeshShape"/>
+    /// and enables backfaces so Jolt does not drop hits on sphere terrain (thin shell + winding).
+    /// </summary>
+    private static Shape3D createTerrainTrimeshCollisionShape(Vector3[] vertices, Vector3[] normals)
+    {
+        var collision_arrays = new Godot.Collections.Array();
+        collision_arrays.Resize((int)Mesh.ArrayType.Max);
+        collision_arrays[(int)Mesh.ArrayType.Vertex] = vertices;
+        if (normals != null && normals.Length == vertices.Length)
+        {
+            collision_arrays[(int)Mesh.ArrayType.Normal] = normals;
+        }
+
+        var collision_mesh = new ArrayMesh();
+        collision_mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, collision_arrays);
+        Shape3D shape = collision_mesh.CreateTrimeshShape();
+        if (shape == null)
+        {
+            return new ConcavePolygonShape3D
+            {
+                Data = vertices,
+                BackfaceCollision = true
+            };
+        }
+
+        if (shape is ConcavePolygonShape3D concave)
+        {
+            concave.BackfaceCollision = true;
+        }
+
+        return shape;
     }
 
     private static Vector3 midpointOnSphere(Vector3 a, Vector3 b)
