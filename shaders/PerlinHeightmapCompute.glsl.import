@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://mekb25xkqgbt"
+path="res://.godot/imported/PerlinHeightmapCompute.glsl-1db0e6fb38136bd3c69d5298ba912807.res"
+
+[deps]
+
+source_file="res://shaders/PerlinHeightmapCompute.glsl"
+dest_files=["res://.godot/imported/PerlinHeightmapCompute.glsl-1db0e6fb38136bd3c69d5298ba912807.res"]
+
+[params]
+

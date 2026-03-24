@@ -1,0 +1,20 @@
+[gd_scene format=3 uid="uid://02jyqpw5ra5j"]
+
+[ext_resource type="Script" uid="uid://bx0rmeg1u2eg2" path="res://scripts/ProceduralPlaneTest.cs" id="1_y3xis"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_y3xis"]
+
+[node name="World" type="Node3D" unique_id=1605994279]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=2124511667]
+script = ExtResource("1_y3xis")
+physical_size = 32.0
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1052388170]
+transform = Transform3D(0.8660254, -0.12940954, -0.4829629, 0.5, 0.22414389, 0.83651626, 0, -0.9659258, 0.25881907, 0, 97, 0)
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1492842799]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.6527467, 11.542871)
+
+[node name="Box" type="MeshInstance3D" parent="." unique_id=170903096]
+mesh = SubResource("BoxMesh_y3xis")
