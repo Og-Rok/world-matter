@@ -19,7 +19,10 @@ public partial class ProceduralPlaneTest : MeshInstance3D
 
 	[Export] public float height_scale = 2.0f;
 
-	/// <summary>Base sampling scale on the vertex grid (coarsest layer). Higher = smaller features.</summary>
+	/// <summary>
+	/// Noise frequency in world space (multiplied with XZ in the same units as <see cref="physical_size"/>).
+	/// Higher = smaller hills; independent of vertex count.
+	/// </summary>
 	[Export] public float noise_scale = 0.08f;
 
 	/// <summary>
@@ -40,7 +43,7 @@ public partial class ProceduralPlaneTest : MeshInstance3D
 		int res = Mathf.Max(2, vertices_per_side);
 		float size = Mathf.Max(0.0001f, physical_size);
 
-		float[] heights = runHeightmapCompute(res);
+		float[] heights = runHeightmapCompute(res, size);
 		if (heights == null || heights.Length != res * res)
 		{
 			heights = new float[res * res];
@@ -62,7 +65,7 @@ public partial class ProceduralPlaneTest : MeshInstance3D
 		base._ExitTree();
 	}
 
-	private float[] runHeightmapCompute(int resolution)
+	private float[] runHeightmapCompute(int resolution, float plane_extent)
 	{
 		var shader_file = GD.Load<RDShaderFile>(compute_shader_path);
 		if (shader_file == null)
@@ -95,7 +98,7 @@ public partial class ProceduralPlaneTest : MeshInstance3D
 		BitConverter.GetBytes((float)resolution).CopyTo(params_bytes, 0);
 		BitConverter.GetBytes(noise_scale).CopyTo(params_bytes, sizeof(float));
 		BitConverter.GetBytes((float)Mathf.Clamp(noise_layers, 1, 16)).CopyTo(params_bytes, 2 * sizeof(float));
-		BitConverter.GetBytes(0.0f).CopyTo(params_bytes, 3 * sizeof(float));
+		BitConverter.GetBytes(plane_extent).CopyTo(params_bytes, 3 * sizeof(float));
 		params_buffer_rid = rd.StorageBufferCreate((uint)params_bytes.Length, params_bytes);
 
 		var uniform_params = new RDUniform

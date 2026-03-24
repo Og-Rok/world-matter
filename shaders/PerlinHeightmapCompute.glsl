@@ -7,7 +7,7 @@ layout(set = 0, binding = 0, std430) restrict buffer ParamsBuffer {
 	float resolution;
 	float noise_scale;
 	float layer_count;
-	float _padding;
+	float physical_size;
 } params;
 
 layout(set = 0, binding = 1, std430) restrict buffer HeightsBuffer {
@@ -62,7 +62,12 @@ void main() {
 		return;
 	}
 
-	vec2 p = vec2(float(gid.x), float(gid.y)) * params.noise_scale;
+	// World XZ matches the mesh: same extent at any vertex count so LOD only changes mesh detail, not terrain shape.
+	float rf = max(float(res) - 1.0, 1.0);
+	vec2 uv = vec2(float(gid.x), float(gid.y)) / rf;
+	float extent = max(params.physical_size, 0.0001);
+	vec2 world_xz = (uv - vec2(0.5)) * extent;
+	vec2 p = world_xz * params.noise_scale;
 	float h = layered_gradient_noise(p);
 	uint idx = gid.x + gid.y * res;
 	heights_buffer.heights[idx] = h;

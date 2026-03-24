@@ -11,7 +11,7 @@ script = ExtResource("1_y3xis")
 physical_size = 256.0
 vertices_per_side = 1024
 height_scale = 40.0
-noise_scale = 0.001
+noise_scale = 0.005
 noise_layers = 9
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1052388170]
