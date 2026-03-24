@@ -2,10 +2,10 @@
 
 [ext_resource type="Shader" uid="uid://cnsqgqmm1o63w" path="res://shaders/TerrainHeightSplat.gdshader" id="1_4e3vf"]
 [ext_resource type="Script" uid="uid://bx0rmeg1u2eg2" path="res://scripts/ProceduralPlaneTest.cs" id="1_y3xis"]
-[ext_resource type="Texture2D" uid="uid://c834vmansehu8" path="res://grass3.png" id="2_3ffgc"]
-[ext_resource type="Texture2D" uid="uid://cseddvhgnhjvv" path="res://rock_weathered_02.png" id="3_2rtrr"]
-[ext_resource type="Texture2D" uid="uid://cof8gly2q3s7r" path="res://SandAndGrass3_S.jpg" id="4_ch7h8"]
-[ext_resource type="Texture2D" uid="uid://jgnentk3l40c" path="res://snow_rocks_02.jpg" id="5_ksu51"]
+[ext_resource type="Texture2D" uid="uid://d2k8grsalb001" path="res://textures/terrain/grass_albedo.png" id="2_3ffgc"]
+[ext_resource type="Texture2D" uid="uid://d2k8rckalb001" path="res://textures/terrain/rock_albedo.png" id="3_2rtrr"]
+[ext_resource type="Texture2D" uid="uid://d2k8sndalb001" path="res://textures/terrain/sand_albedo.png" id="4_ch7h8"]
+[ext_resource type="Texture2D" uid="uid://d2k8snwalb001" path="res://textures/terrain/snow_albedo.png" id="5_ksu51"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_bpjkm"]
 render_priority = 0
