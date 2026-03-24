@@ -19,12 +19,14 @@ public partial class ProceduralPlaneTest : MeshInstance3D
 
 	[Export] public float height_scale = 2.0f;
 
-	/// <summary>Lower = broader hills (applied in UV-like grid space before FBM).</summary>
+	/// <summary>Base sampling scale on the vertex grid (coarsest layer). Higher = smaller features.</summary>
 	[Export] public float noise_scale = 0.08f;
 
-	[Export] public int noise_octaves = 5;
-
-	[Export] public float noise_persistence = 0.5f;
+	/// <summary>
+	/// Number of noise layers. Each added layer doubles coordinate scale (finer detail) and halves amplitude vs. the previous layer.
+	/// </summary>
+	[Export(PropertyHint.Range, "1,16,1")]
+	public int noise_layers = 5;
 
 	private RenderingDevice rd;
 	private Rid height_buffer_rid;
@@ -92,8 +94,8 @@ public partial class ProceduralPlaneTest : MeshInstance3D
 		byte[] params_bytes = new byte[4 * sizeof(float)];
 		BitConverter.GetBytes((float)resolution).CopyTo(params_bytes, 0);
 		BitConverter.GetBytes(noise_scale).CopyTo(params_bytes, sizeof(float));
-		BitConverter.GetBytes((float)Mathf.Clamp(noise_octaves, 1, 8)).CopyTo(params_bytes, 2 * sizeof(float));
-		BitConverter.GetBytes(noise_persistence).CopyTo(params_bytes, 3 * sizeof(float));
+		BitConverter.GetBytes((float)Mathf.Clamp(noise_layers, 1, 16)).CopyTo(params_bytes, 2 * sizeof(float));
+		BitConverter.GetBytes(0.0f).CopyTo(params_bytes, 3 * sizeof(float));
 		params_buffer_rid = rd.StorageBufferCreate((uint)params_bytes.Length, params_bytes);
 
 		var uniform_params = new RDUniform

@@ -6,8 +6,8 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 layout(set = 0, binding = 0, std430) restrict buffer ParamsBuffer {
 	float resolution;
 	float noise_scale;
-	float octaves_count;
-	float persistence;
+	float layer_count;
+	float _padding;
 } params;
 
 layout(set = 0, binding = 1, std430) restrict buffer HeightsBuffer {
@@ -40,20 +40,19 @@ float gradient_noise(vec2 p) {
 	return mix(mix(v00, v10, u.x), mix(v01, v11, u.x), u.y);
 }
 
-float fbm(vec2 p) {
-	int oct = clamp(int(params.octaves_count + 0.5), 1, 8);
+// Each layer: sample at 2× the previous frequency; strength (amplitude) is ½ the previous layer — summed, not renormalized,
+// so layer 1 adds at most half of layer 0’s peak, layer 2 at most half of layer 1’s, etc.
+float layered_gradient_noise(vec2 base_p) {
+	int layers = clamp(int(params.layer_count + 0.5), 1, 16);
 	float amp = 1.0;
 	float freq = 1.0;
 	float sum = 0.0;
-	float norm = 0.0;
-	float pers = params.persistence;
-	for (int o = 0; o < oct; o++) {
-		sum += amp * gradient_noise(p * freq);
-		norm += amp;
-		amp *= pers;
-		freq *= 2.02;
+	for (int i = 0; i < layers; i++) {
+		sum += amp * gradient_noise(base_p * freq);
+		amp *= 0.5;
+		freq *= 2.0;
 	}
-	return norm > 0.0 ? sum / norm : 0.0;
+	return sum;
 }
 
 void main() {
@@ -64,7 +63,7 @@ void main() {
 	}
 
 	vec2 p = vec2(float(gid.x), float(gid.y)) * params.noise_scale;
-	float h = fbm(p);
+	float h = layered_gradient_noise(p);
 	uint idx = gid.x + gid.y * res;
 	heights_buffer.heights[idx] = h;
 }
