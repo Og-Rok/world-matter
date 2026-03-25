@@ -1,11 +1,13 @@
 [gd_scene format=3 uid="uid://02jyqpw5ra5j"]
 
 [ext_resource type="Shader" uid="uid://cnsqgqmm1o63w" path="res://shaders/TerrainHeightSplat.gdshader" id="1_4e3vf"]
+[ext_resource type="Shader" uid="uid://bfn62bv7qrab5" path="res://shaders/WaterSurface.gdshader" id="1_water"]
 [ext_resource type="Script" uid="uid://bx0rmeg1u2eg2" path="res://scripts/ProceduralPlaneTest.cs" id="1_y3xis"]
 [ext_resource type="Texture2D" uid="uid://d2k8grsalb001" path="res://textures/terrain/grass_albedo.png" id="2_3ffgc"]
 [ext_resource type="Texture2D" uid="uid://d2k8rckalb001" path="res://textures/terrain/rock_albedo.png" id="3_2rtrr"]
 [ext_resource type="Texture2D" uid="uid://d2k8sndalb001" path="res://textures/terrain/sand_albedo.png" id="4_ch7h8"]
 [ext_resource type="Texture2D" uid="uid://d2k8snwalb001" path="res://textures/terrain/snow_albedo.png" id="5_ksu51"]
+[ext_resource type="Texture2D" uid="uid://bgi62b0p65ab5" path="res://textures/water/wave_normal.png" id="6_wave"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_bpjkm"]
 render_priority = 0
@@ -14,28 +16,50 @@ shader_parameter/sand_albedo = ExtResource("4_ch7h8")
 shader_parameter/grass_albedo = ExtResource("2_3ffgc")
 shader_parameter/rock_albedo = ExtResource("3_2rtrr")
 shader_parameter/snow_albedo = ExtResource("5_ksu51")
-shader_parameter/texture_scale = 4.0
-shader_parameter/water_level = -15.0
-shader_parameter/sand_max_height = 0.0
-shader_parameter/grass_begins_height = -10.0
-shader_parameter/snow_begins_height = 5.0
-shader_parameter/snow_full_height = 8.0
-shader_parameter/rock_slope_start = 0.65
-shader_parameter/rock_slope_full = 0.85
-shader_parameter/rock_sand_suppress = 0.85
-shader_parameter/underwater_tint = Color(0.45, 0.65, 0.85, 1)
-shader_parameter/underwater_blend = 0.55
+shader_parameter/texture_scale = 36.0
+shader_parameter/water_level = 15.0
+shader_parameter/sand_max_height = 8.0
+shader_parameter/grass_begins_height = 16.0
+shader_parameter/snow_begins_height = 27.0
+shader_parameter/snow_full_height = 38.0
+shader_parameter/rock_slope_start = 0.38
+shader_parameter/rock_slope_full = 0.7
+shader_parameter/rock_sand_suppress = 0.92
+shader_parameter/underwater_tint = Color(0.38, 0.6, 0.9, 1)
+shader_parameter/underwater_blend = 0.65
+shader_parameter/blend_noise_scale = 0.026
+shader_parameter/blend_height_jitter = 9.5
+shader_parameter/blend_slope_jitter = 0.095
 
 [sub_resource type="BoxMesh" id="BoxMesh_y3xis"]
 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_water"]
+render_priority = 1
+shader = ExtResource("1_water")
+shader_parameter/wave_normal = ExtResource("6_wave")
+shader_parameter/deep_color = Color(0.03, 0.14, 0.22, 1)
+shader_parameter/shallow_color = Color(0.2, 0.58, 0.66, 1)
+shader_parameter/murkiness = 0.5250000249375
+shader_parameter/refraction_strength = 0.022
+shader_parameter/fresnel_power = 5.2
+shader_parameter/alpha_base = 0.28600001195506
+shader_parameter/alpha_max = 0.6510000285934301
+shader_parameter/roughness = 0.14000000665
+shader_parameter/specular = 1.0
+shader_parameter/wave_tiling = 3.6810001510975
+shader_parameter/wave_scroll_a = Vector2(0.035, 0.018)
+shader_parameter/wave_scroll_b = Vector2(-0.028, 0.04)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_3ffgc"]
+
 [node name="World" type="Node3D" unique_id=1605994279]
 
-[node name="Plane" type="MeshInstance3D" parent="." unique_id=1165969280]
+[node name="Terrain" type="MeshInstance3D" parent="." unique_id=1165969280]
 material_override = SubResource("ShaderMaterial_bpjkm")
 script = ExtResource("1_y3xis")
-physical_size = 256.0
+physical_size = 512.0
 vertices_per_side = 1024
-height_scale = 40.0
+height_scale = 55.0
 noise_scale = 0.005
 noise_layers = 9
 
@@ -47,3 +71,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.6527467, 11.542871)
 
 [node name="Box" type="MeshInstance3D" parent="." unique_id=170903096]
 mesh = SubResource("BoxMesh_y3xis")
+
+[node name="Water" type="MeshInstance3D" parent="." unique_id=817777320]
+transform = Transform3D(250, 0, 0, 0, 1, 0, 0, 0, 250, 0, 15, 0)
+material_override = SubResource("ShaderMaterial_water")
+mesh = SubResource("PlaneMesh_3ffgc")

@@ -3,7 +3,7 @@ using System;
 
 /// <summary>
 /// Builds a vertex grid on the XZ plane at <see cref="physical_size"/> world units per side,
-/// with <see cref="vertices_per_side"/> vertices along each edge; fills heights on the GPU, then displaces Y and recomputes normals.
+/// with <see cref="vertices_per_side"/> vertices along each edge; fills heights on the GPU, recenters so the lowest sample is 0, then displaces Y upward and recomputes normals.
 /// </summary>
 public partial class ProceduralPlaneTest : MeshInstance3D
 {
@@ -49,6 +49,7 @@ public partial class ProceduralPlaneTest : MeshInstance3D
 			heights = new float[res * res];
 		}
 
+		normalizeHeightmapSoMinimumIsZero(heights);
 		Mesh = buildDisplacedPlaneMesh(heights, res, size);
 		if (MaterialOverride == null)
 		{
@@ -189,6 +190,32 @@ public partial class ProceduralPlaneTest : MeshInstance3D
 
 		rd.Free();
 		rd = null;
+	}
+
+	/// <summary>
+	/// Shifts all samples by the global minimum so the heightmap is ≥ 0 and the mesh sits on Y = 0 at its lowest points.
+	/// Relative relief is unchanged; <see cref="height_scale"/> still scales upward from there.
+	/// </summary>
+	private static void normalizeHeightmapSoMinimumIsZero(float[] heights)
+	{
+		if (heights == null || heights.Length == 0)
+		{
+			return;
+		}
+
+		float min_h = heights[0];
+		for (int i = 1; i < heights.Length; i++)
+		{
+			if (heights[i] < min_h)
+			{
+				min_h = heights[i];
+			}
+		}
+
+		for (int i = 0; i < heights.Length; i++)
+		{
+			heights[i] -= min_h;
+		}
 	}
 
 	private static float sampleHeight(float[] heights, int x, int z, int vx, int vz)

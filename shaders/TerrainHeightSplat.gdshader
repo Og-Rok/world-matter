@@ -32,6 +32,14 @@ uniform float rock_sand_suppress = 0.85;
 uniform vec4 underwater_tint : source_color = vec4(0.45, 0.65, 0.85, 1.0);
 uniform float underwater_blend : hint_range(0.0, 1.0) = 0.55;
 
+// --- Noisy blend boundaries (breaks up hard snow/grass/rock lines) ---
+/// World XZ frequency for blend noise (higher = smaller irregular patches).
+uniform float blend_noise_scale = 0.06;
+/// How far height thresholds jitter in world Y (meters).
+uniform float blend_height_jitter = 0.55;
+/// How much slope thresholds jitter (0–1 slope space).
+uniform float blend_slope_jitter = 0.14;
+
 varying vec3 v_world_pos;
 varying vec3 v_world_normal;
 
@@ -60,12 +68,49 @@ vec4 sample_tri(sampler2D tex, vec3 world_p, vec3 n) {
 	return texture(tex, uvx) * w.x + texture(tex, uvy) * w.y + texture(tex, uvz) * w.z;
 }
 
+float hash21(vec2 p) {
+	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float value_noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	float a = hash21(i);
+	float b = hash21(i + vec2(1.0, 0.0));
+	float c = hash21(i + vec2(0.0, 1.0));
+	float d = hash21(i + vec2(1.0, 1.0));
+	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+/// ~0..1, decently smooth; use different seeds via offset p.
+float blend_noise_fbm(vec2 p) {
+	float s = 0.0;
+	float a = 0.5;
+	float f = 1.0;
+	for (int i = 0; i < 4; i++) {
+		s += a * value_noise(p * f);
+		f *= 2.02;
+		a *= 0.5;
+	}
+	return s;
+}
+
 void fragment() {
 	vec3 n = normalize(v_world_normal);
 	float h = v_world_pos.y;
 
 	// 0 = flat facing up, 1 = cliff
 	float slope = 1.0 - clamp(dot(n, vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
+
+	vec2 bn_uv = v_world_pos.xz * max(blend_noise_scale, 0.0001);
+	float n0 = blend_noise_fbm(bn_uv);
+	float n1 = blend_noise_fbm(bn_uv * 1.37 + vec2(19.2, 47.5));
+	float n3 = blend_noise_fbm(bn_uv * 1.09 + vec2(61.0, 289.0));
+	// Center around 0 so thresholds wander both ways
+	float j_h0 = (n0 - 0.48) * 2.0 * blend_height_jitter;
+	float j_h1 = (n1 - 0.48) * 2.0 * blend_height_jitter;
+	float j_slope = (n3 - 0.48) * 2.0 * blend_slope_jitter;
 
 	vec2 uv = world_xz_uv(v_world_pos);
 	vec4 sand_c = texture(sand_albedo, uv);
@@ -74,16 +119,20 @@ void fragment() {
 	vec4 rock_c = sample_tri(rock_albedo, v_world_pos, n);
 	vec4 snow_c = texture(snow_albedo, uv);
 
-	// Height: sand -> grass -> snow
-	float sand_w = 1.0 - smoothstep(sand_max_height, grass_begins_height, h);
-	float snow_w = smoothstep(snow_begins_height, snow_full_height, h);
+	// Height: sand -> grass -> snow (jittered edges so bands aren’t perfectly straight)
+	float sand_w = 1.0 - smoothstep(sand_max_height + j_h0, grass_begins_height + j_h0, h);
+	float snow_w = smoothstep(snow_begins_height + j_h1, snow_full_height + j_h1, h);
 	float grass_w = (1.0 - sand_w) * (1.0 - snow_w);
 
 	vec3 base = sand_c.rgb * sand_w + grass_c.rgb * grass_w + snow_c.rgb * snow_w;
 
-	float rock_w = smoothstep(rock_slope_start, rock_slope_full, slope);
+	float rock_w = smoothstep(rock_slope_start + j_slope, rock_slope_full + j_slope, slope);
 	rock_w *= mix(1.0, rock_sand_suppress, sand_w);
-	vec3 with_rock = mix(base, rock_c.rgb, rock_w);
+	// On snowy slopes, vary how strongly rock replaces snow so the boundary isn’t a smooth ring
+	float n_rock = blend_noise_fbm(bn_uv * 2.4 + vec2(400.0, 900.0));
+	float rock_soft = mix(0.72, 1.0, n_rock);
+	rock_w *= mix(1.0, rock_soft, min(snow_w * 1.8, 1.0));
+	vec3 with_rock = mix(base, rock_c.rgb, clamp(rock_w, 0.0, 1.0));
 
 	// Underwater / wet sand tint
 	float below = 1.0 - smoothstep(water_level - 0.15, water_level + 0.05, h);
