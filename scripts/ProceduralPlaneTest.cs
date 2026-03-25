@@ -31,6 +31,20 @@ public partial class ProceduralPlaneTest : MeshInstance3D
 	[Export(PropertyHint.Range, "1,16,1")]
 	public int noise_layers = 5;
 
+	// --- Water mesh trimming ---
+	/// <summary>World Y height of the water surface. Quads fully above this are excluded from the water mesh.</summary>
+	[Export] public float water_level = 15.0f;
+
+	/// <summary>
+	/// Resolution of the generated water mesh grid (independent of terrain resolution since water is flat).
+	/// Lower values = fewer vertices but less precise shoreline.
+	/// </summary>
+	[Export(PropertyHint.Range, "2,1024,1")]
+	public int water_resolution = 256;
+
+	/// <summary>Assign the Water MeshInstance3D here; its mesh will be replaced with a trimmed flat mesh at runtime.</summary>
+	[Export] public MeshInstance3D water_mesh_target;
+
 	private RenderingDevice rd;
 	private Rid height_buffer_rid;
 	private Rid params_buffer_rid;
@@ -57,6 +71,13 @@ public partial class ProceduralPlaneTest : MeshInstance3D
 			{
 				AlbedoColor = new Color(0.35f, 0.55f, 0.28f)
 			};
+		}
+
+		if (water_mesh_target != null)
+		{
+			int wres = Mathf.Clamp(water_resolution, 2, 4096);
+			water_mesh_target.Mesh = buildWaterMesh(heights, res, size, wres);
+			water_mesh_target.Transform = Transform3D.Identity;
 		}
 	}
 
@@ -216,6 +237,83 @@ public partial class ProceduralPlaneTest : MeshInstance3D
 		{
 			heights[i] -= min_h;
 		}
+	}
+
+	/// <summary>
+	/// Builds a flat mesh at <see cref="water_level"/> that covers only the cells where the terrain is below the
+	/// water surface. Uses an independent <paramref name="water_res"/> grid so water can be lower resolution than terrain.
+	/// </summary>
+	private ArrayMesh buildWaterMesh(float[] terrain_heights, int terrain_res, float plane_size, int water_res)
+	{
+		float half = plane_size * 0.5f;
+
+		var vertices = new Vector3[water_res * water_res];
+		var normals  = new Vector3[water_res * water_res];
+		var uvs      = new Vector2[water_res * water_res];
+
+		for (int z = 0; z < water_res; z++)
+		{
+			for (int x = 0; x < water_res; x++)
+			{
+				int i = x + z * water_res;
+				float u = x / (float)(water_res - 1);
+				float v = z / (float)(water_res - 1);
+				vertices[i] = new Vector3(u * plane_size - half, water_level, v * plane_size - half);
+				normals[i]  = Vector3.Up;
+				uvs[i]      = new Vector2(u, v);
+			}
+		}
+
+		var indices = new System.Collections.Generic.List<int>();
+		for (int z = 0; z < water_res - 1; z++)
+		{
+			for (int x = 0; x < water_res - 1; x++)
+			{
+				float h00 = sampleTerrainAtWaterPoint(terrain_heights, terrain_res, water_res, x,     z    ) * height_scale;
+				float h10 = sampleTerrainAtWaterPoint(terrain_heights, terrain_res, water_res, x + 1, z    ) * height_scale;
+				float h01 = sampleTerrainAtWaterPoint(terrain_heights, terrain_res, water_res, x,     z + 1) * height_scale;
+				float h11 = sampleTerrainAtWaterPoint(terrain_heights, terrain_res, water_res, x + 1, z + 1) * height_scale;
+
+				// Skip quads where every corner is above the water line
+				if (h00 >= water_level && h10 >= water_level && h01 >= water_level && h11 >= water_level)
+				{
+					continue;
+				}
+
+				int i00 = x + z * water_res;
+				int i10 = i00 + 1;
+				int i01 = i00 + water_res;
+				int i11 = i01 + 1;
+
+				indices.Add(i00); indices.Add(i10); indices.Add(i01);
+				indices.Add(i10); indices.Add(i11); indices.Add(i01);
+			}
+		}
+
+		if (indices.Count == 0)
+		{
+			return null;
+		}
+
+		var arrays = new Godot.Collections.Array();
+		arrays.Resize((int)Mesh.ArrayType.Max);
+		arrays[(int)Mesh.ArrayType.Vertex] = vertices;
+		arrays[(int)Mesh.ArrayType.Normal] = normals;
+		arrays[(int)Mesh.ArrayType.TexUV]  = uvs;
+		arrays[(int)Mesh.ArrayType.Index]  = indices.ToArray();
+
+		var mesh = new ArrayMesh();
+		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+		return mesh;
+	}
+
+	private static float sampleTerrainAtWaterPoint(float[] terrain_heights, int terrain_res, int water_res, int wx, int wz)
+	{
+		int tx = Mathf.RoundToInt(wx * (terrain_res - 1.0f) / (water_res - 1.0f));
+		int tz = Mathf.RoundToInt(wz * (terrain_res - 1.0f) / (water_res - 1.0f));
+		tx = Mathf.Clamp(tx, 0, terrain_res - 1);
+		tz = Mathf.Clamp(tz, 0, terrain_res - 1);
+		return terrain_heights[tx + tz * terrain_res];
 	}
 
 	private static float sampleHeight(float[] heights, int x, int z, int vx, int vz)

@@ -50,11 +50,9 @@ shader_parameter/wave_tiling = 3.6810001510975
 shader_parameter/wave_scroll_a = Vector2(0.035, 0.018)
 shader_parameter/wave_scroll_b = Vector2(-0.028, 0.04)
 
-[sub_resource type="PlaneMesh" id="PlaneMesh_3ffgc"]
-
 [node name="World" type="Node3D" unique_id=1605994279]
 
-[node name="Terrain" type="MeshInstance3D" parent="." unique_id=1165969280]
+[node name="Terrain" type="MeshInstance3D" parent="." unique_id=1165969280 node_paths=PackedStringArray("water_mesh_target")]
 material_override = SubResource("ShaderMaterial_bpjkm")
 script = ExtResource("1_y3xis")
 physical_size = 512.0
@@ -62,6 +60,7 @@ vertices_per_side = 1024
 height_scale = 55.0
 noise_scale = 0.005
 noise_layers = 9
+water_mesh_target = NodePath("../Water")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1052388170]
 transform = Transform3D(0.8660254, -0.12940954, -0.4829629, 0.5, 0.22414389, 0.83651626, 0, -0.9659258, 0.25881907, 0, 97, 0)
@@ -73,6 +72,4 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.6527467, 11.542871)
 mesh = SubResource("BoxMesh_y3xis")
 
 [node name="Water" type="MeshInstance3D" parent="." unique_id=817777320]
-transform = Transform3D(250, 0, 0, 0, 1, 0, 0, 0, 250, 0, 15, 0)
 material_override = SubResource("ShaderMaterial_water")
-mesh = SubResource("PlaneMesh_3ffgc")
