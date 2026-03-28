@@ -1,0 +1,575 @@
+[gd_scene format=4 uid="uid://1cih3r20s7f0"]
+
+[ext_resource type="Script" uid="uid://tdrrtexif3gl" path="res://scripts/WorldBuilder.cs" id="1_4ye4k"]
+[ext_resource type="Script" uid="uid://c7ysq43svfjwk" path="res://scripts/WorldBuilderPlane.cs" id="2_yjjwd"]
+[ext_resource type="Script" uid="uid://b7pj0kblf2ln0" path="res://scripts/LODTracker.cs" id="3_wen80"]
+[ext_resource type="Shader" uid="uid://bfn62bv7qrab5" path="res://shaders/WaterSurface.gdshader" id="7_x3vp5"]
+[ext_resource type="Texture2D" uid="uid://bgi62b0p65ab5" path="res://textures/water/wave_normal.png" id="8_36rgp"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wen80"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_n7smf"]
+_surfaces = [{
+"aabb": AABB(-170.54065, -385.9925, -385.9925, 422.64972, 707.10675, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("aIoqwzYegMM2HoDD7Bt8Q6COoEOgjqBDACMjwqCOoEMK/8DDaIoqwzYegMM2HoDDACMjwgr/wMOgjqBD7Bt8Q6COoEOgjqBDVNWqKv9//5////9//3//v////7+qqqmqVNWqKv9//5//v/8/VFWpqv///3//f/+/")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2cgs6"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_el7cg"]
+_surfaces = [{
+"aabb": AABB(-170.54065, -321.11426, -385.9925, 422.64972, 707.10675, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("ACMjwqCOoMMK/8DDACMjwgr/wEOgjqBDaIoqwzYegEM2HoDDACMjwqCOoMMK/8DD7Bt8Q6COoMOgjqBDACMjwgr/wEOgjqBD////v6qqqar/v/+/VFVU1VTVVNUAAACA////v6qqqar///9//3//v/+//79UVVTV")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2ajss"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_8fvxt"]
+_surfaces = [{
+"aabb": AABB(-170.54065, -385.9925, -321.11426, 422.64972, 707.10675, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("ACMjwgr/wMOgjqDDACMjwqCOoEMK/8BD7Bt8Q6COoEOgjqDDACMjwgr/wMOgjqDDaIoqwzYegMM2HoBDACMjwqCOoEMK/8BD/7//P1RVqar/v/9/VFWpqv///3//f/+//7//P1RVqaqqqlRV/z//n/+//39UVamq")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_k7n5d"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_1a37m"]
+_surfaces = [{
+"aabb": AABB(-170.54065, -321.11426, -321.11426, 422.64972, 707.10675, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("7Bt8Q6COoMOgjqDDaIoqwzYegEM2HoBDACMjwgr/wEOgjqDD7Bt8Q6COoMOgjqDDACMjwqCOoMMK/8BDaIoqwzYegEM2HoBD////f/9//7+qqqqq/z//v/+//79UVVTV////f/9//7//v/9/VFWpqqqqqqr/P/+/")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i7tb3"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_x3vp5"]
+_surfaces = [{
+"aabb": AABB(-252.10907, -385.9925, -321.11426, 422.64972, 707.10675, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("aIoqQzYegMM2HoBD7Bt8w6COoEOgjqDDACMjQqCOoEMK/8BDaIoqQzYegMM2HoBDACMjQgr/wMOgjqDD7Bt8w6COoEOgjqDDVFVUVQAAAIAAAP9//3//v/8//3+qqqmqVFVUVQAAAID/P/8/VFVU1QAA/3//f/+/")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_36rgp"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_grhvc"]
+_surfaces = [{
+"aabb": AABB(-252.10907, -321.11426, -321.11426, 422.64972, 707.10675, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("ACMjQqCOoMMK/8BDACMjQgr/wEOgjqDDaIoqQzYegEM2HoBDACMjQqCOoMMK/8BD7Bt8w6COoMOgjqDDACMjQgr/wEOgjqDD/z//f6qqqar/P/+/VFWpqlRVqqr/f/+f/z//f6qqqaoAAP9//3//v/8//79UVamq")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_6g6ss"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_lfcf5"]
+_surfaces = [{
+"aabb": AABB(-252.10907, -385.9925, -385.9925, 422.64972, 707.10675, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("ACMjQgr/wMOgjqBDACMjQqCOoEMK/8DD7Bt8w6COoEOgjqBDACMjQgr/wMOgjqBDaIoqQzYegMM2HoDDACMjQqCOoEMK/8DD/z//P1RVVNUAAP+/VFWpqgAA/3//f/+//z//P1RVVNWqKqoq/z//vwAA/79UVamq")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3ucu1"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_dos0w"]
+_surfaces = [{
+"aabb": AABB(-252.10907, -321.11426, -385.9925, 422.64972, 707.10675, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("7Bt8w6COoMOgjqBDaIoqQzYegEM2HoDDACMjQgr/wEOgjqBD7Bt8w6COoMOgjqBDACMjQqCOoMMK/8DDaIoqQzYegEM2HoDDAAD/f/9//7+qKlTV/z//n/8//79UVamqAAD/f/9//78AAP+/VFWpqqoqVNX/P/+f")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_opoyr"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_10jxi"]
+_surfaces = [{
+"aabb": AABB(-385.9925, -170.54065, -321.11426, 707.10675, 422.64972, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("Nh6Aw2iKKsM2HoBDoI6gQ+wbfEOgjqDDoI6gQwAjI8IK/8BDNh6Aw2iKKsM2HoBDCv/AwwAjI8KgjqDDoI6gQ+wbfEOgjqDDVFWqqv9//5//f///AAD/v/9//79UVamqVFWqqv9//5//P/+/VFWpqv9///8AAP+/")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_p4102"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_rd7xq"]
+_surfaces = [{
+"aabb": AABB(-321.11426, -170.54065, -321.11426, 707.10675, 422.64972, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("oI6gwwAjI8IK/8BDCv/AQwAjI8KgjqDDNh6AQ2iKKsM2HoBDoI6gwwAjI8IK/8BDoI6gw+wbfEOgjqDDCv/AQwAjI8KgjqDD/3//v1RVqar/v/+/VFVU1aqqqqr/P/+//3//v1RVqar/f///AAD/v/+//79UVVTV")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_xbnih"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_77j8j"]
+_surfaces = [{
+"aabb": AABB(-385.9925, -170.54065, -385.9925, 707.10675, 422.64972, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("Cv/AwwAjI8KgjqBDoI6gQwAjI8IK/8DDoI6gQ+wbfEOgjqBDCv/AwwAjI8KgjqBDNh6Aw2iKKsM2HoDDoI6gQwAjI8IK/8DD/z//v1RVqar/v///qipUlf9///8AAP+//z//v1RVqaqqKlTV/z//n/+///+qKlSV")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_6ek14"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_3m0aq"]
+_surfaces = [{
+"aabb": AABB(-321.11426, -170.54065, -385.9925, 707.10675, 422.64972, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("oI6gw+wbfEOgjqBDNh6AQ2iKKsM2HoDDCv/AQwAjI8KgjqBDoI6gw+wbfEOgjqBDoI6gwwAjI8IK/8DDNh6AQ2iKKsM2HoDD/3///wAA/79U1VTVAAAAgP+//79UVVTV/3///wAA/7//v///qipUlVTVVNUAAACA")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_edqqq"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_8ychb"]
+_surfaces = [{
+"aabb": AABB(-385.9925, -252.10907, -385.9925, 707.10675, 422.64972, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("Nh6Aw2iKKkM2HoDDoI6gQ+wbfMOgjqBDoI6gQwAjI0IK/8DDNh6Aw2iKKkM2HoDDCv/AwwAjI0KgjqBDoI6gQ+wbfMOgjqBDqiqqKv8//7//fwAAAAD/v/+/AABUVamqqiqqKv8//7//P/8/VFVU1f9/AAAAAP+/")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_luse2"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_2yoll"]
+_surfaces = [{
+"aabb": AABB(-321.11426, -252.10907, -385.9925, 707.10675, 422.64972, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("oI6gwwAjI0IK/8DDCv/AQwAjI0KgjqBDNh6AQ2iKKkM2HoDDoI6gwwAjI0IK/8DDoI6gw+wbfMOgjqBDCv/AQwAjI0KgjqBD/78AAFRVqar/v/8/VFWpqlTVqir/f/+f/78AAFRVqar/fwAAAAD/v/+//z9UVamq")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_jqwl5"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_0ticr"]
+_surfaces = [{
+"aabb": AABB(-385.9925, -252.10907, -321.11426, 707.10675, 422.64972, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("Cv/AwwAjI0KgjqDDoI6gQwAjI0IK/8BDoI6gQ+wbfMOgjqDDCv/AwwAjI0KgjqDDNh6Aw2iKKkM2HoBDoI6gQwAjI0IK/8BD/z//P1RVVNX/f/8/qipUlf9/AAAAAP+//z//P1RVVNVUVVRVAAAAgP9//z+qKlSV")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_yigeb"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_ddumd"]
+_surfaces = [{
+"aabb": AABB(-321.11426, -252.10907, -321.11426, 707.10675, 422.64972, 707.10675),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("oI6gw+wbfMOgjqDDNh6AQ2iKKkM2HoBDCv/AQwAjI0KgjqDDoI6gw+wbfMOgjqDDoI6gwwAjI0IK/8BDNh6AQ2iKKkM2HoBD/38AAAAA/7+qqlRV/z//n/+//z9UVamq/38AAAAA/7//f/8/qipUlaqqVFX/P/+f")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_v4qh1"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_qgnde"]
+_surfaces = [{
+"aabb": AABB(-385.9925, -385.9925, -252.10907, 707.10675, 707.10675, 422.64972),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("Nh6AwzYegMNoiipDoI6gQ6COoEPsG3zDCv/Aw6COoEMAIyNCNh6AwzYegMNoiipDoI6gQwr/wMMAIyNCoI6gQ6COoEPsG3zDqiqqKv8//7///////38AgAAA/79UVamqqiqqKv8//7//vwAAVFWpqv//////fwCA")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_a3qni"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_mvnq4"]
+_surfaces = [{
+"aabb": AABB(-385.9925, -321.11426, -252.10907, 707.10675, 707.10675, 422.64972),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("Cv/Aw6COoMMAIyNCoI6gQwr/wEMAIyNCNh6AwzYegENoiipDCv/Aw6COoMMAIyNCoI6gQ6COoMPsG3zDoI6gQwr/wEMAIyNCAAD/v1RVqar/v///qipUlaoqVNX/P/+fAAD/v1RVqar//////38AgP+///+qKlSV")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_31qv0"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_qeilt"]
+_surfaces = [{
+"aabb": AABB(-321.11426, -385.9925, -252.10907, 707.10675, 707.10675, 422.64972),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("oI6gwwr/wMMAIyNCCv/AQ6COoEMAIyNCoI6gw6COoEPsG3zDoI6gwwr/wMMAIyNCNh6AQzYegMNoiipDCv/AQ6COoEMAIyNC/78AAFRVqar///+/qqqpqv//////fwCA/78AAFRVqapU1aoq/3//n////7+qqqmq")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8ais1"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_37ye2"]
+_surfaces = [{
+"aabb": AABB(-321.11426, -321.11426, -252.10907, 707.10675, 707.10675, 422.64972),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("oI6gw6COoMPsG3zDNh6AQzYegENoiipDoI6gwwr/wEMAIyNCoI6gw6COoMPsG3zDCv/AQ6COoMMAIyNCNh6AQzYegENoiipD//////9/AIBU1VTVAAAAgP+///+qKlSV//////9/AID///+/qqqpqlTVVNUAAACA")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_d8rqn"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_okjqx"]
+_surfaces = [{
+"aabb": AABB(-321.11426, -385.9925, -170.54065, 707.10675, 707.10675, 422.64972),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("Nh6AQzYegMNoiirDoI6gw6COoEPsG3xDCv/AQ6COoEMAIyPCNh6AQzYegMNoiirDoI6gwwr/wMMAIyPCoI6gw6COoEPsG3xDqqpUVf8//5//f/9//38AgP+//39UVamqqqpUVf8//5//f/8/qipUlf9//3//fwCA")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_s6l1c"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_4a1vt"]
+_surfaces = [{
+"aabb": AABB(-321.11426, -321.11426, -170.54065, 707.10675, 707.10675, 422.64972),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("Cv/AQ6COoMMAIyPCoI6gwwr/wEMAIyPCNh6AQzYegENoiirDCv/AQ6COoMMAIyPCoI6gw6COoMPsG3xDoI6gwwr/wEMAIyPC/7//f1RVqar/f/+/VFWpqqqqqqr/P/+//7//f1RVqar/f/9//38AgP9//79UVamq")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bokvv"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_42tr6"]
+_surfaces = [{
+"aabb": AABB(-385.9925, -385.9925, -170.54065, 707.10675, 707.10675, 422.64972),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("oI6gQwr/wMMAIyPCCv/Aw6COoEMAIyPCoI6gQ6COoEPsG3xDoI6gQwr/wMMAIyPCNh6AwzYegMNoiirDCv/Aw6COoEMAIyPC/3//P6oqVJX/P/9/qqqpqv9//3//fwCA/3//P6oqVJVUVVRVAAAAgP8//3+qqqmq")
+}]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_27gjb"]
+albedo_color = Color(0.35, 0.52, 0.85, 1)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_jruri"]
+_surfaces = [{
+"aabb": AABB(-385.9925, -321.11426, -170.54065, 707.10675, 707.10675, 422.64972),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("oI6gQ6COoMPsG3xDNh6AwzYegENoiirDoI6gQwr/wEMAIyPCoI6gQ6COoMPsG3xDCv/Aw6COoMMAIyPCNh6AwzYegENoiirD/3//f/9/AIBUVaqq/3//n/9//79UVamq/3//f/9/AID/P/9/qqqpqlRVqqr/f/+f")
+}]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_water"]
+render_priority = 1
+shader = ExtResource("7_x3vp5")
+shader_parameter/wave_normal = ExtResource("8_36rgp")
+shader_parameter/deep_color = Color(0.03, 0.14, 0.22, 1)
+shader_parameter/shallow_color = Color(0.2, 0.58, 0.66, 1)
+shader_parameter/murkiness = 0.5250000249375
+shader_parameter/refraction_strength = 0.022
+shader_parameter/fresnel_power = 5.2
+shader_parameter/alpha_base = 0.28600001195506
+shader_parameter/alpha_max = 0.6510000285934301
+shader_parameter/roughness = 0.14000000665
+shader_parameter/specular = 1.0
+shader_parameter/wave_tiling = 3.6810001510975
+shader_parameter/wave_scroll_a = Vector2(0.035, 0.018)
+shader_parameter/wave_scroll_b = Vector2(-0.028, 0.04)
+
+[sub_resource type="BoxMesh" id="BoxMesh_y3xis"]
+
+[node name="World" type="Node3D" unique_id=1605994279]
+
+[node name="WorldBuilder" type="MeshInstance3D" parent="." unique_id=1165969280]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1000)
+script = ExtResource("1_4ye4k")
+radius = 1000.0
+
+[node name="PlanetShell_0" type="Node3D" parent="WorldBuilder" unique_id=262931577]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 747.8909, -321.11426, -321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_0" unique_id=2071047580]
+material_override = SubResource("StandardMaterial3D_wen80")
+mesh = SubResource("ArrayMesh_n7smf")
+
+[node name="PlanetShell_1" type="Node3D" parent="WorldBuilder" unique_id=442365504]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 747.8909, 321.11426, -321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_1" unique_id=996359550]
+material_override = SubResource("StandardMaterial3D_2cgs6")
+mesh = SubResource("ArrayMesh_el7cg")
+
+[node name="PlanetShell_2" type="Node3D" parent="WorldBuilder" unique_id=966265791]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 747.8909, -321.11426, 321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_2" unique_id=1758326609]
+material_override = SubResource("StandardMaterial3D_2ajss")
+mesh = SubResource("ArrayMesh_8fvxt")
+
+[node name="PlanetShell_3" type="Node3D" parent="WorldBuilder" unique_id=1987572228]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 747.8909, 321.11426, 321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_3" unique_id=244418383]
+material_override = SubResource("StandardMaterial3D_k7n5d")
+mesh = SubResource("ArrayMesh_1a37m")
+
+[node name="PlanetShell_4" type="Node3D" parent="WorldBuilder" unique_id=1144118568]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -747.8909, -321.11426, 321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_4" unique_id=906638656]
+material_override = SubResource("StandardMaterial3D_i7tb3")
+mesh = SubResource("ArrayMesh_x3vp5")
+
+[node name="PlanetShell_5" type="Node3D" parent="WorldBuilder" unique_id=323502591]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -747.8909, 321.11426, 321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_5" unique_id=913545424]
+material_override = SubResource("StandardMaterial3D_36rgp")
+mesh = SubResource("ArrayMesh_grhvc")
+
+[node name="PlanetShell_6" type="Node3D" parent="WorldBuilder" unique_id=592172893]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -747.8909, -321.11426, -321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_6" unique_id=2112997245]
+material_override = SubResource("StandardMaterial3D_6g6ss")
+mesh = SubResource("ArrayMesh_lfcf5")
+
+[node name="PlanetShell_7" type="Node3D" parent="WorldBuilder" unique_id=419004771]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -747.8909, 321.11426, -321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_7" unique_id=250078614]
+material_override = SubResource("StandardMaterial3D_3ucu1")
+mesh = SubResource("ArrayMesh_dos0w")
+
+[node name="PlanetShell_8" type="Node3D" parent="WorldBuilder" unique_id=1221620337]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, 747.8909, 321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_8" unique_id=478748459]
+material_override = SubResource("StandardMaterial3D_opoyr")
+mesh = SubResource("ArrayMesh_10jxi")
+
+[node name="PlanetShell_9" type="Node3D" parent="WorldBuilder" unique_id=173673865]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, 747.8909, 321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_9" unique_id=1011287189]
+material_override = SubResource("StandardMaterial3D_p4102")
+mesh = SubResource("ArrayMesh_rd7xq")
+
+[node name="PlanetShell_10" type="Node3D" parent="WorldBuilder" unique_id=1741400910]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, 747.8909, -321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_10" unique_id=2131794386]
+material_override = SubResource("StandardMaterial3D_xbnih")
+mesh = SubResource("ArrayMesh_77j8j")
+
+[node name="PlanetShell_11" type="Node3D" parent="WorldBuilder" unique_id=1455272676]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, 747.8909, -321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_11" unique_id=132749340]
+material_override = SubResource("StandardMaterial3D_6ek14")
+mesh = SubResource("ArrayMesh_3m0aq")
+
+[node name="PlanetShell_12" type="Node3D" parent="WorldBuilder" unique_id=948328443]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, -747.8909, -321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_12" unique_id=1727879067]
+material_override = SubResource("StandardMaterial3D_edqqq")
+mesh = SubResource("ArrayMesh_8ychb")
+
+[node name="PlanetShell_13" type="Node3D" parent="WorldBuilder" unique_id=2083537869]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, -747.8909, -321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_13" unique_id=1517737904]
+material_override = SubResource("StandardMaterial3D_luse2")
+mesh = SubResource("ArrayMesh_2yoll")
+
+[node name="PlanetShell_14" type="Node3D" parent="WorldBuilder" unique_id=464598302]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, -747.8909, 321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_14" unique_id=1804843591]
+material_override = SubResource("StandardMaterial3D_jqwl5")
+mesh = SubResource("ArrayMesh_0ticr")
+
+[node name="PlanetShell_15" type="Node3D" parent="WorldBuilder" unique_id=895269198]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, -747.8909, 321.11426)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_15" unique_id=538187514]
+material_override = SubResource("StandardMaterial3D_yigeb")
+mesh = SubResource("ArrayMesh_ddumd")
+
+[node name="PlanetShell_16" type="Node3D" parent="WorldBuilder" unique_id=162790877]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, -321.11426, -747.8909)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_16" unique_id=570902360]
+material_override = SubResource("StandardMaterial3D_v4qh1")
+mesh = SubResource("ArrayMesh_qgnde")
+
+[node name="PlanetShell_17" type="Node3D" parent="WorldBuilder" unique_id=656780953]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, 321.11426, -747.8909)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_17" unique_id=1381912365]
+material_override = SubResource("StandardMaterial3D_a3qni")
+mesh = SubResource("ArrayMesh_mvnq4")
+
+[node name="PlanetShell_18" type="Node3D" parent="WorldBuilder" unique_id=1955598486]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, -321.11426, -747.8909)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_18" unique_id=1196196663]
+material_override = SubResource("StandardMaterial3D_31qv0")
+mesh = SubResource("ArrayMesh_qeilt")
+
+[node name="PlanetShell_19" type="Node3D" parent="WorldBuilder" unique_id=67656971]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, 321.11426, -747.8909)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_19" unique_id=720255649]
+material_override = SubResource("StandardMaterial3D_8ais1")
+mesh = SubResource("ArrayMesh_37ye2")
+
+[node name="PlanetShell_20" type="Node3D" parent="WorldBuilder" unique_id=2114436928]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, -321.11426, 747.8909)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_20" unique_id=668772583]
+material_override = SubResource("StandardMaterial3D_d8rqn")
+mesh = SubResource("ArrayMesh_okjqx")
+
+[node name="PlanetShell_21" type="Node3D" parent="WorldBuilder" unique_id=1630370439]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, 321.11426, 747.8909)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_21" unique_id=1306498089]
+material_override = SubResource("StandardMaterial3D_s6l1c")
+mesh = SubResource("ArrayMesh_4a1vt")
+
+[node name="PlanetShell_22" type="Node3D" parent="WorldBuilder" unique_id=562115286]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, -321.11426, 747.8909)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_22" unique_id=481125178]
+material_override = SubResource("StandardMaterial3D_bokvv")
+mesh = SubResource("ArrayMesh_42tr6")
+
+[node name="PlanetShell_23" type="Node3D" parent="WorldBuilder" unique_id=938093756]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, 321.11426, 747.8909)
+script = ExtResource("2_yjjwd")
+
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_23" unique_id=2027066341]
+material_override = SubResource("StandardMaterial3D_27gjb")
+mesh = SubResource("ArrayMesh_jruri")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1052388170]
+transform = Transform3D(0.8660254, -0.12940954, -0.4829629, 0.34349304, -0.54792607, 0.7627512, -0.36333528, -0.82645637, -0.43006667, 0, 97, 0)
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1492842799]
+transform = Transform3D(-0.1497597, 0, 0.98872244, 0, 1, 0, -0.98872244, 0, -0.1497597, 45.29489, 33.5692, -22.05496)
+
+[node name="Water" type="MeshInstance3D" parent="." unique_id=817777320]
+material_override = SubResource("ShaderMaterial_water")
+
+[node name="Box" type="MeshInstance3D" parent="." unique_id=170903096]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 528.28906, -28.9272)
+mesh = SubResource("BoxMesh_y3xis")
+script = ExtResource("3_wen80")
