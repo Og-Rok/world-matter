@@ -1,10 +1,11 @@
 using Godot;
+using System;
 using System.Collections.Generic;
 
 /// <summary>
 /// One planet shell quad: four corner positions in <see cref="WorldBuilder"/> (planet) space, transform and mesh
 /// so the patch sits on the sphere; optional LOD via <see cref="LODTracker"/> splits into four child planes when the
-/// camera is closer than <see cref="divide_distance"/>. At <see cref="max_lod_depth"/>, mesh tessellation uses the final LOD count from <see cref="WorldBuilder.mesh_subdivisions_final_lod"/>.
+/// camera is closer than <see cref="divide_distance"/> (doubled on the last quad split tier, <c>depth == max_lod_depth - 1</c>). At <see cref="max_lod_depth"/>, mesh tessellation uses <see cref="WorldBuilder.mesh_subdivisions_final_lod"/>.
 /// </summary>
 [Tool]
 public partial class WorldBuilderPlane : Node3D
@@ -14,11 +15,26 @@ public partial class WorldBuilderPlane : Node3D
 	/// <summary>Half of the longest distance between any two of the four corner points.</summary>
 	public float divide_distance;
 
-	[Export(PropertyHint.Range, "0,32,1")]
+	/// <summary>Set by <see cref="WorldBuilder"/> on root patches (or copied from parent when LOD splits).</summary>
 	public int max_lod_depth = 10;
 
-	[Export(PropertyHint.Range, "0,2,0.01,or_greater")]
+	/// <summary>Set by <see cref="WorldBuilder"/> on root patches (or copied from parent when LOD splits).</summary>
 	public double lod_update_interval_seconds = 0.2;
+
+	/// <summary>Set by <see cref="WorldBuilder"/> (or copied from parent patch when LOD splits).</summary>
+	public string compute_shader_path = "res://shaders/PerlinHeightmapCompute.glsl";
+
+	/// <summary>If true, run <see cref="compute_shader_path"/> like <see cref="ProceduralPlaneTest"/> and displace the patch mesh radially by the height samples.</summary>
+	public bool use_gpu_heightmap = true;
+
+	public float height_scale = 2.0f;
+
+	public float noise_scale = 0.08f;
+
+	public int noise_layers = 5;
+
+	/// <summary>Unused for GPU height on sphere patches (noise samples 3D WorldBuilder-space positions from corners).</summary>
+	public float patch_noise_physical_size = 0.0f;
 
 	private Vector3 corner_00;
 	private Vector3 corner_10;
@@ -33,6 +49,13 @@ public partial class WorldBuilderPlane : Node3D
 	private Material planet_material;
 	private bool is_configured;
 	private double lod_time_accum;
+
+	private RenderingDevice heightmap_rd;
+	private Rid heightmap_height_buffer_rid;
+	private Rid heightmap_params_buffer_rid;
+	private Rid heightmap_shader_rid;
+	private Rid heightmap_pipeline_rid;
+	private Rid heightmap_uniform_set_rid;
 
 	/// <summary>Call before the node enters the scene tree. UVs default to the full unit quad; final LOD tessellation defaults to 8.</summary>
 	public void configure(
@@ -107,6 +130,12 @@ public partial class WorldBuilderPlane : Node3D
 		assignEditorOwnersForShell();
 	}
 
+	public override void _ExitTree()
+	{
+		freeHeightmapComputeResources();
+		base._ExitTree();
+	}
+
 	public override void _PhysicsProcess(double delta)
 	{
 		if (!is_configured || Engine.IsEditorHint())
@@ -131,7 +160,13 @@ public partial class WorldBuilderPlane : Node3D
 		}
 
 		float distance = getDistanceToLodTracker();
-		bool should_subdivide = distance < divide_distance && divide_distance > 1e-5f && getLodDepth() < max_lod_depth;
+		float subdivide_threshold = divide_distance;
+		if (max_lod_depth > 0 && getLodDepth() == max_lod_depth - 1)
+		{
+			subdivide_threshold *= 4f;
+		}
+
+		bool should_subdivide = distance < subdivide_threshold && subdivide_threshold > 1e-5f && getLodDepth() < max_lod_depth;
 		bool has_plane_children = hasWorldBuilderPlaneChildren();
 
 		if (should_subdivide && has_plane_children)
@@ -258,6 +293,12 @@ public partial class WorldBuilderPlane : Node3D
 		child.Name = "Sub_" + child_index;
 		child.max_lod_depth = max_lod_depth;
 		child.lod_update_interval_seconds = lod_update_interval_seconds;
+		child.compute_shader_path = compute_shader_path;
+		child.use_gpu_heightmap = use_gpu_heightmap;
+		child.height_scale = height_scale;
+		child.noise_scale = noise_scale;
+		child.noise_layers = noise_layers;
+		child.patch_noise_physical_size = patch_noise_physical_size;
 		child.configure(c00, c10, c11, c01, planet_material, u00, u10, u11, u01, mesh_subdivisions, mesh_subdivisions_final);
 		AddChild(child);
 		assignOwnerForEditorSave(child);
@@ -299,37 +340,66 @@ public partial class WorldBuilderPlane : Node3D
 		divide_distance = max_corner_span * 0.5f;
 
 		Vector3 face_midpoint = computeShellPatchFaceCenter(corner_00, corner_10, corner_11, corner_01);
-		Vector3 parent_patch_mid = Vector3.Zero;
-		if (GetParent() is WorldBuilderPlane parent_plane)
-		{
-			parent_patch_mid = parent_plane.getFaceMidpointInPlanetSpace();
-		}
-
-		Position = face_midpoint - parent_patch_mid;
+		applyPatchOriginAtCornerCentroid(face_midpoint);
 
 		var vertices = new List<Vector3>();
 		var normals = new List<Vector3>();
 		var uvs = new List<Vector2>();
-		WorldBuilder.appendTessellatedSphericalQuadLocalToPatch(
-			corner_00,
-			corner_10,
-			corner_11,
-			corner_01,
-			uv_00,
-			uv_10,
-			uv_11,
-			uv_01,
-			getEffectiveMeshSubdivisions(),
-			face_midpoint,
-			vertices,
-			normals,
-			uvs);
+
+		int n = getEffectiveMeshSubdivisions();
+		int res = n + 1;
+		float[] heights = null;
+		if (use_gpu_heightmap)
+		{
+			heights = runHeightmapCompute(res);
+		}
+
+		int[] index_array = null;
+		if (heights != null && heights.Length == res * res)
+		{
+			var indices = new List<int>();
+			buildTessellatedPatchMeshFromHeights(
+				heights,
+				res,
+				face_midpoint,
+				vertices,
+				normals,
+				uvs,
+				indices);
+			index_array = indices.ToArray();
+		}
+		else
+		{
+			if (use_gpu_heightmap && heights == null)
+			{
+				GD.PushWarning("WorldBuilderPlane: GPU heightmap failed; using flat tessellation.");
+			}
+
+			WorldBuilder.appendTessellatedSphericalQuadLocalToPatch(
+				corner_00,
+				corner_10,
+				corner_11,
+				corner_01,
+				uv_00,
+				uv_10,
+				uv_11,
+				uv_01,
+				n,
+				face_midpoint,
+				vertices,
+				normals,
+				uvs);
+		}
 
 		var arrays = new Godot.Collections.Array();
 		arrays.Resize((int)Mesh.ArrayType.Max);
 		arrays[(int)Mesh.ArrayType.Vertex] = vertices.ToArray();
 		arrays[(int)Mesh.ArrayType.Normal] = normals.ToArray();
 		arrays[(int)Mesh.ArrayType.TexUV] = uvs.ToArray();
+		if (index_array != null)
+		{
+			arrays[(int)Mesh.ArrayType.Index] = index_array;
+		}
 
 		var face_mesh = new ArrayMesh();
 		face_mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
@@ -387,6 +457,43 @@ public partial class WorldBuilderPlane : Node3D
 		return (p00 + p10 + p11 + p01) * 0.25f;
 	}
 
+	/// <summary>
+	/// Places this node’s origin on the four-corner centroid: same as <see cref="computeShellPatchFaceCenter"/>, in parent
+	/// local space (no extra subtract of a parent face midpoint).
+	/// </summary>
+	private void applyPatchOriginAtCornerCentroid(Vector3 face_midpoint_planet_space)
+	{
+		WorldBuilder wb = findAncestorWorldBuilderForThisPlane();
+		if (wb == null)
+		{
+			Position = face_midpoint_planet_space;
+			return;
+		}
+
+		Vector3 centroid_world = wb.GlobalTransform * face_midpoint_planet_space;
+		if (GetParent() is Node3D parent_nd)
+		{
+			Position = parent_nd.GlobalTransform.AffineInverse() * centroid_world;
+		}
+		else
+		{
+			Position = face_midpoint_planet_space;
+		}
+	}
+
+	private WorldBuilder findAncestorWorldBuilderForThisPlane()
+	{
+		for (Node n = GetParent(); n != null; n = n.GetParent())
+		{
+			if (n is WorldBuilder builder)
+			{
+				return builder;
+			}
+		}
+
+		return null;
+	}
+
 	private static float maxDistanceAmongFourCorners(Vector3 p00, Vector3 p10, Vector3 p11, Vector3 p01)
 	{
 		float max_sq = 0f;
@@ -418,5 +525,246 @@ public partial class WorldBuilderPlane : Node3D
 		}
 
 		return midpoint.Normalized() * sphere_radius;
+	}
+
+	private const int heightmap_params_byte_count = 6 * 16;
+
+	private static void writeVec4ToByteBuffer(byte[] buf, int offset, Vector4 vec)
+	{
+		BitConverter.GetBytes(vec.X).CopyTo(buf, offset);
+		BitConverter.GetBytes(vec.Y).CopyTo(buf, offset + 4);
+		BitConverter.GetBytes(vec.Z).CopyTo(buf, offset + 8);
+		BitConverter.GetBytes(vec.W).CopyTo(buf, offset + 12);
+	}
+
+	private float[] runHeightmapCompute(int resolution)
+	{
+		var shader_file = GD.Load<RDShaderFile>(compute_shader_path);
+		if (shader_file == null)
+		{
+			GD.PushError($"WorldBuilderPlane: could not load compute shader at {compute_shader_path}");
+			return null;
+		}
+
+		heightmap_rd = RenderingServer.CreateLocalRenderingDevice();
+		if (heightmap_rd == null)
+		{
+			GD.PushError("WorldBuilderPlane: CreateLocalRenderingDevice failed (use Forward+ or Mobile renderer).");
+			return null;
+		}
+
+		RDShaderSpirV spirv = shader_file.GetSpirV();
+		heightmap_shader_rid = heightmap_rd.ShaderCreateFromSpirV(spirv);
+		if (!heightmap_shader_rid.IsValid)
+		{
+			GD.PushError("WorldBuilderPlane: ShaderCreateFromSpirV failed.");
+			freeHeightmapComputeResources();
+			return null;
+		}
+
+		int height_count = resolution * resolution;
+		int height_bytes = height_count * sizeof(float);
+		heightmap_height_buffer_rid = heightmap_rd.StorageBufferCreate((uint)height_bytes, Array.Empty<byte>());
+
+		var params_bytes = new byte[heightmap_params_byte_count];
+		float layers = Mathf.Clamp(noise_layers, 1, 16);
+		writeVec4ToByteBuffer(
+			params_bytes,
+			0,
+			new Vector4(resolution, noise_scale, layers, 1.0f));
+		writeVec4ToByteBuffer(params_bytes, 16, Vector4.Zero);
+		writeVec4ToByteBuffer(params_bytes, 32, new Vector4(corner_00.X, corner_00.Y, corner_00.Z, 0.0f));
+		writeVec4ToByteBuffer(params_bytes, 48, new Vector4(corner_10.X, corner_10.Y, corner_10.Z, 0.0f));
+		writeVec4ToByteBuffer(params_bytes, 64, new Vector4(corner_11.X, corner_11.Y, corner_11.Z, 0.0f));
+		writeVec4ToByteBuffer(params_bytes, 80, new Vector4(corner_01.X, corner_01.Y, corner_01.Z, 0.0f));
+		heightmap_params_buffer_rid = heightmap_rd.StorageBufferCreate((uint)params_bytes.Length, params_bytes);
+
+		var uniform_params = new RDUniform
+		{
+			UniformType = RenderingDevice.UniformType.StorageBuffer,
+			Binding = 0
+		};
+		uniform_params.AddId(heightmap_params_buffer_rid);
+
+		var uniform_heights = new RDUniform
+		{
+			UniformType = RenderingDevice.UniformType.StorageBuffer,
+			Binding = 1
+		};
+		uniform_heights.AddId(heightmap_height_buffer_rid);
+
+		var uniforms = new Godot.Collections.Array<RDUniform> { uniform_params, uniform_heights };
+		heightmap_uniform_set_rid = heightmap_rd.UniformSetCreate(uniforms, heightmap_shader_rid, 0);
+		if (!heightmap_uniform_set_rid.IsValid)
+		{
+			GD.PushError("WorldBuilderPlane: UniformSetCreate failed.");
+			freeHeightmapComputeResources();
+			return null;
+		}
+
+		heightmap_pipeline_rid = heightmap_rd.ComputePipelineCreate(heightmap_shader_rid);
+		int groups = Mathf.CeilToInt(resolution / 8.0f);
+		long cl = heightmap_rd.ComputeListBegin();
+		heightmap_rd.ComputeListBindComputePipeline(cl, heightmap_pipeline_rid);
+		heightmap_rd.ComputeListBindUniformSet(cl, heightmap_uniform_set_rid, 0);
+		heightmap_rd.ComputeListDispatch(cl, (uint)groups, (uint)groups, 1);
+		heightmap_rd.ComputeListEnd();
+
+		heightmap_rd.Submit();
+		heightmap_rd.Sync();
+
+		byte[] raw = heightmap_rd.BufferGetData(heightmap_height_buffer_rid);
+		if (raw == null || raw.Length < height_bytes)
+		{
+			GD.PushError("WorldBuilderPlane: BufferGetData returned unexpected size.");
+			freeHeightmapComputeResources();
+			return null;
+		}
+
+		var heights = new float[height_count];
+		Buffer.BlockCopy(raw, 0, heights, 0, height_bytes);
+
+		freeHeightmapComputeResources();
+		return heights;
+	}
+
+	private void freeHeightmapComputeResources()
+	{
+		if (heightmap_rd == null)
+		{
+			return;
+		}
+
+		if (heightmap_uniform_set_rid.IsValid)
+		{
+			heightmap_rd.FreeRid(heightmap_uniform_set_rid);
+			heightmap_uniform_set_rid = default;
+		}
+
+		if (heightmap_pipeline_rid.IsValid)
+		{
+			heightmap_rd.FreeRid(heightmap_pipeline_rid);
+			heightmap_pipeline_rid = default;
+		}
+
+		if (heightmap_shader_rid.IsValid)
+		{
+			heightmap_rd.FreeRid(heightmap_shader_rid);
+			heightmap_shader_rid = default;
+		}
+
+		if (heightmap_height_buffer_rid.IsValid)
+		{
+			heightmap_rd.FreeRid(heightmap_height_buffer_rid);
+			heightmap_height_buffer_rid = default;
+		}
+
+		if (heightmap_params_buffer_rid.IsValid)
+		{
+			heightmap_rd.FreeRid(heightmap_params_buffer_rid);
+			heightmap_params_buffer_rid = default;
+		}
+
+		heightmap_rd.Free();
+		heightmap_rd = null;
+	}
+
+	private void buildTessellatedPatchMeshFromHeights(
+		float[] heights,
+		int res,
+		Vector3 face_midpoint,
+		List<Vector3> vertices,
+		List<Vector3> normals,
+		List<Vector2> uvs,
+		List<int> indices)
+	{
+		float rf = Mathf.Max(res - 1, 1);
+		var world = new Vector3[res, res];
+
+		for (int j = 0; j < res; j++)
+		{
+			float tv = j / rf;
+			for (int i = 0; i < res; i++)
+			{
+				float tu = i / rf;
+				Vector3 base_on_sphere = sampleSphericalQuadWorld(corner_00, corner_10, corner_11, corner_01, tu, tv);
+				float h = heights[i + j * res];
+				world[i, j] = base_on_sphere + base_on_sphere.Normalized() * (h * height_scale);
+			}
+		}
+
+		for (int j = 0; j < res; j++)
+		{
+			for (int i = 0; i < res; i++)
+			{
+				Vector3 n = computeDisplacedGridNormal(world, i, j, res);
+				Vector3 local = world[i, j] - face_midpoint;
+				vertices.Add(local);
+				normals.Add(n);
+				float tu = i / rf;
+				float tv = j / rf;
+				Vector2 uv = (1.0f - tu) * (1.0f - tv) * uv_00
+					+ tu * (1.0f - tv) * uv_10
+					+ tu * tv * uv_11
+					+ (1.0f - tu) * tv * uv_01;
+				uvs.Add(uv);
+			}
+		}
+
+		int quad_span = res - 1;
+		for (int j = 0; j < quad_span; j++)
+		{
+			for (int i = 0; i < quad_span; i++)
+			{
+				int i00 = i + j * res;
+				int i10 = i00 + 1;
+				int i01 = i00 + res;
+				int i11 = i01 + 1;
+				// Winding must match the non-indexed patch path (Godot front-face culling vs. sphere quads).
+				indices.Add(i00);
+				indices.Add(i01);
+				indices.Add(i10);
+				indices.Add(i10);
+				indices.Add(i01);
+				indices.Add(i11);
+			}
+		}
+	}
+
+	private static Vector3 sampleSphericalQuadWorld(Vector3 p00, Vector3 p10, Vector3 p11, Vector3 p01, float tu, float tv)
+	{
+		Vector3 blended = (1.0f - tu) * (1.0f - tv) * p00
+			+ tu * (1.0f - tv) * p10
+			+ tu * tv * p11
+			+ (1.0f - tu) * tv * p01;
+		float r = (p00.Length() + p10.Length() + p11.Length() + p01.Length()) * 0.25f;
+		if (blended == Vector3.Zero)
+		{
+			return p00;
+		}
+
+		return blended.Normalized() * r;
+	}
+
+	private static Vector3 computeDisplacedGridNormal(Vector3[,] world, int i, int j, int res)
+	{
+		if (i > 0 && i < res - 1 && j > 0 && j < res - 1)
+		{
+			Vector3 du = world[i + 1, j] - world[i - 1, j];
+			Vector3 dv = world[i, j + 1] - world[i, j - 1];
+			Vector3 n = du.Cross(dv);
+			if (n.LengthSquared() > 1e-12f)
+			{
+				n = n.Normalized();
+				if (n.Dot(world[i, j]) < 0.0f)
+				{
+					n = -n;
+				}
+
+				return n;
+			}
+		}
+
+		return world[i, j].Normalized();
 	}
 }

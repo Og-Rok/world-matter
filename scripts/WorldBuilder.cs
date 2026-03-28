@@ -3,7 +3,8 @@ using System.Collections.Generic;
 
 /// <summary>
 /// Cubed-sphere quadtree roots: <c>6 × 2 × 2 = 24</c> <see cref="WorldBuilderPlane"/> patches (four children per patch when LOD splits).
-/// <see cref="mesh_subdivisions"/> refines mesh density on non-deepest patches; <see cref="mesh_subdivisions_final_lod"/> applies at <see cref="WorldBuilderPlane.max_lod_depth"/>.
+/// <see cref="mesh_subdivisions"/> refines mesh density on non-deepest patches; <see cref="mesh_subdivisions_final_lod"/> applies at <see cref="shell_max_lod_depth"/>.
+/// GPU heightmap, noise, and LOD (<see cref="shell_max_lod_depth"/>, <see cref="compute_shader_path"/>, etc.) are configured on this node.
 /// </summary>
 [Tool]
 public partial class WorldBuilder : Node3D
@@ -33,11 +34,35 @@ public partial class WorldBuilder : Node3D
 	[Export(PropertyHint.Range, "1,64,1")]
 	public int mesh_subdivisions = 1;
 
-	/// <summary>Mesh tessellation for patches at <see cref="WorldBuilderPlane.max_lod_depth"/> (deepest leaves only).</summary>
+	/// <summary>Mesh tessellation for patches at <see cref="shell_max_lod_depth"/> (deepest leaves only).</summary>
 	[Export(PropertyHint.Range, "1,128,1")]
 	public int mesh_subdivisions_final_lod = 8;
 
+	[ExportGroup("LOD (patches)")]
+	[Export(PropertyHint.Range, "0,32,1")]
+	public int shell_max_lod_depth = 10;
+
+	[Export(PropertyHint.Range, "0,2,0.01,or_greater")]
+	public double shell_lod_update_interval_seconds = 0.2;
+
 	[Export] public Material planet_material;
+
+	[ExportGroup("GPU heightmap (patches)")]
+	[Export] public string compute_shader_path = "res://shaders/PerlinHeightmapCompute.glsl";
+
+	[Export] public bool use_gpu_heightmap = true;
+
+	[Export(PropertyHint.Range, "0,100,0.01,or_greater")]
+	public float shell_height_scale = 2.0f;
+
+	[Export] public float shell_noise_scale = 0.08f;
+
+	[Export(PropertyHint.Range, "1,16,1")]
+	public int shell_noise_layers = 5;
+
+	/// <summary>Reserved; shell GPU noise uses 3D positions in WorldBuilder space (patch corners), not XZ extent.</summary>
+	[Export(PropertyHint.Range, "0,100000,0.01,or_greater")]
+	public float shell_patch_noise_physical_size = 0.0f;
 
 	public override void _Ready()
 	{
@@ -99,11 +124,24 @@ public partial class WorldBuilder : Node3D
 						new Vector2(x * inv_cells, (y + 1) * inv_cells),
 						patch_mesh,
 						patch_mesh_final);
+					applyShellParametersToPlane(plane);
 					AddChild(plane);
 					quad_index++;
 				}
 			}
 		}
+	}
+
+	private void applyShellParametersToPlane(WorldBuilderPlane plane)
+	{
+		plane.max_lod_depth = shell_max_lod_depth;
+		plane.lod_update_interval_seconds = shell_lod_update_interval_seconds;
+		plane.compute_shader_path = compute_shader_path;
+		plane.use_gpu_heightmap = use_gpu_heightmap;
+		plane.height_scale = shell_height_scale;
+		plane.noise_scale = shell_noise_scale;
+		plane.noise_layers = shell_noise_layers;
+		plane.patch_noise_physical_size = shell_patch_noise_physical_size;
 	}
 
 	private void removePreviousPlanetShellChildren()

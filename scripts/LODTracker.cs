@@ -32,11 +32,17 @@ public partial class LODTracker : Node3D
 		{
 			is_tab_pressed = false;
 		}
+
 		GetViewport().DebugDraw = debug_wireframe_viewport
 			? Viewport.DebugDrawEnum.Wireframe
 			: Viewport.DebugDrawEnum.Disabled;
 		base._PhysicsProcess(delta);
 		Camera3D camera = GetViewport().GetCamera3D();
+		if (camera == null)
+		{
+			return;
+		}
+
 		GlobalPosition = GlobalPosition.Lerp(camera.GlobalPosition + -camera.GlobalTransform.Basis.Z * 5.0f, (float)delta);
 		GlobalRotation = GlobalRotation.Lerp(camera.GlobalRotation, (float)delta);
 	}

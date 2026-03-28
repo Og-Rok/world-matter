@@ -172,6 +172,14 @@ public partial class ProceduralPlaneTest : MeshInstance3D
 		return heights;
 	}
 
+	private static void writeVec4ToByteBuffer(byte[] buf, int offset, Vector4 vec)
+	{
+		BitConverter.GetBytes(vec.X).CopyTo(buf, offset);
+		BitConverter.GetBytes(vec.Y).CopyTo(buf, offset + 4);
+		BitConverter.GetBytes(vec.Z).CopyTo(buf, offset + 8);
+		BitConverter.GetBytes(vec.W).CopyTo(buf, offset + 12);
+	}
+
 	private void freeComputeResources()
 	{
 		if (rd == null)
