@@ -4,7 +4,7 @@ using System.Collections.Generic;
 /// <summary>
 /// One planet shell quad: four corner positions in <see cref="WorldBuilder"/> (planet) space, transform and mesh
 /// so the patch sits on the sphere; optional LOD via <see cref="LODTracker"/> splits into four child planes when the
-/// camera is closer than <see cref="divide_distance"/>.
+/// camera is closer than <see cref="divide_distance"/>. At <see cref="max_lod_depth"/>, mesh tessellation uses the final LOD count from <see cref="WorldBuilder.mesh_subdivisions_final_lod"/>.
 /// </summary>
 [Tool]
 public partial class WorldBuilderPlane : Node3D
@@ -29,18 +29,20 @@ public partial class WorldBuilderPlane : Node3D
 	private Vector2 uv_11;
 	private Vector2 uv_01;
 	private int mesh_subdivisions = 1;
+	private int mesh_subdivisions_final = 8;
 	private Material planet_material;
 	private bool is_configured;
 	private double lod_time_accum;
 
-	/// <summary>Call before the node enters the scene tree. UVs default to the full unit quad; mesh tessellation defaults to one cell per axis.</summary>
+	/// <summary>Call before the node enters the scene tree. UVs default to the full unit quad; final LOD tessellation defaults to 8.</summary>
 	public void configure(
 		Vector3 corner_p00,
 		Vector3 corner_p10,
 		Vector3 corner_p11,
 		Vector3 corner_p01,
 		Material material,
-		int patch_mesh_subdivisions = 1)
+		int patch_mesh_subdivisions = 1,
+		int patch_mesh_subdivisions_final = 8)
 	{
 		configure(
 			corner_p00,
@@ -52,7 +54,8 @@ public partial class WorldBuilderPlane : Node3D
 			new Vector2(1, 0),
 			new Vector2(1, 1),
 			new Vector2(0, 1),
-			patch_mesh_subdivisions);
+			patch_mesh_subdivisions,
+			patch_mesh_subdivisions_final);
 	}
 
 	/// <param name="uv_corner_p00">UV at <paramref name="corner_p00"/> (matches cubed-sphere face layout from <see cref="WorldBuilder"/>).</param>
@@ -66,7 +69,8 @@ public partial class WorldBuilderPlane : Node3D
 		Vector2 uv_corner_p10,
 		Vector2 uv_corner_p11,
 		Vector2 uv_corner_p01,
-		int patch_mesh_subdivisions)
+		int patch_mesh_subdivisions,
+		int patch_mesh_subdivisions_final)
 	{
 		corner_00 = corner_p00;
 		corner_10 = corner_p10;
@@ -77,6 +81,7 @@ public partial class WorldBuilderPlane : Node3D
 		uv_11 = uv_corner_p11;
 		uv_01 = uv_corner_p01;
 		mesh_subdivisions = Mathf.Max(1, patch_mesh_subdivisions);
+		mesh_subdivisions_final = Mathf.Max(1, patch_mesh_subdivisions_final);
 		planet_material = material;
 		is_configured = true;
 	}
@@ -167,6 +172,17 @@ public partial class WorldBuilderPlane : Node3D
 		return depth;
 	}
 
+	/// <summary>Deepest quadtree leaves (<c>depth == max_lod_depth</c>) use <see cref="mesh_subdivisions_final"/>; others use <see cref="mesh_subdivisions"/>.</summary>
+	private int getEffectiveMeshSubdivisions()
+	{
+		if (getLodDepth() >= max_lod_depth)
+		{
+			return mesh_subdivisions_final;
+		}
+
+		return mesh_subdivisions;
+	}
+
 	private float getDistanceToLodTracker()
 	{
 		Vector3 cam = LODTracker.instance.GlobalPosition;
@@ -242,7 +258,7 @@ public partial class WorldBuilderPlane : Node3D
 		child.Name = "Sub_" + child_index;
 		child.max_lod_depth = max_lod_depth;
 		child.lod_update_interval_seconds = lod_update_interval_seconds;
-		child.configure(c00, c10, c11, c01, planet_material, u00, u10, u11, u01, mesh_subdivisions);
+		child.configure(c00, c10, c11, c01, planet_material, u00, u10, u11, u01, mesh_subdivisions, mesh_subdivisions_final);
 		AddChild(child);
 		assignOwnerForEditorSave(child);
 	}
@@ -303,7 +319,7 @@ public partial class WorldBuilderPlane : Node3D
 			uv_10,
 			uv_11,
 			uv_01,
-			mesh_subdivisions,
+			getEffectiveMeshSubdivisions(),
 			face_midpoint,
 			vertices,
 			normals,

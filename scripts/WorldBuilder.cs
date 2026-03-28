@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 /// <summary>
 /// Cubed-sphere quadtree roots: <c>6 × 2 × 2 = 24</c> <see cref="WorldBuilderPlane"/> patches (four children per patch when LOD splits).
-/// <see cref="mesh_subdivisions"/> only refines the generated mesh inside each quad, not the tree breadth.
+/// <see cref="mesh_subdivisions"/> refines mesh density on non-deepest patches; <see cref="mesh_subdivisions_final_lod"/> applies at <see cref="WorldBuilderPlane.max_lod_depth"/>.
 /// </summary>
 [Tool]
 public partial class WorldBuilder : Node3D
@@ -33,6 +33,10 @@ public partial class WorldBuilder : Node3D
 	[Export(PropertyHint.Range, "1,64,1")]
 	public int mesh_subdivisions = 1;
 
+	/// <summary>Mesh tessellation for patches at <see cref="WorldBuilderPlane.max_lod_depth"/> (deepest leaves only).</summary>
+	[Export(PropertyHint.Range, "1,128,1")]
+	public int mesh_subdivisions_final_lod = 8;
+
 	[Export] public Material planet_material;
 
 	public override void _Ready()
@@ -58,6 +62,7 @@ public partial class WorldBuilder : Node3D
 		float step = 2.0f / cells_per_axis;
 		float inv_cells = 1.0f / cells_per_axis;
 		int patch_mesh = Mathf.Max(1, mesh_subdivisions);
+		int patch_mesh_final = Mathf.Max(1, mesh_subdivisions_final_lod);
 
 		int quad_index = 0;
 		for (int face_index = 0; face_index < face_normals.Length; face_index++)
@@ -92,7 +97,8 @@ public partial class WorldBuilder : Node3D
 						new Vector2((x + 1) * inv_cells, y * inv_cells),
 						new Vector2((x + 1) * inv_cells, (y + 1) * inv_cells),
 						new Vector2(x * inv_cells, (y + 1) * inv_cells),
-						patch_mesh);
+						patch_mesh,
+						patch_mesh_final);
 					AddChild(plane);
 					quad_index++;
 				}
