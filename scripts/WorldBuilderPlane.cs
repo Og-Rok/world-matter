@@ -24,22 +24,59 @@ public partial class WorldBuilderPlane : Node3D
 	private Vector3 corner_10;
 	private Vector3 corner_11;
 	private Vector3 corner_01;
+	private Vector2 uv_00;
+	private Vector2 uv_10;
+	private Vector2 uv_11;
+	private Vector2 uv_01;
+	private int mesh_subdivisions = 1;
 	private Material planet_material;
 	private bool is_configured;
 	private double lod_time_accum;
 
-	/// <summary>Call before the node enters the scene tree (e.g. before <see cref="Node.AddChild"/>).</summary>
+	/// <summary>Call before the node enters the scene tree. UVs default to the full unit quad; mesh tessellation defaults to one cell per axis.</summary>
 	public void configure(
 		Vector3 corner_p00,
 		Vector3 corner_p10,
 		Vector3 corner_p11,
 		Vector3 corner_p01,
-		Material material)
+		Material material,
+		int patch_mesh_subdivisions = 1)
+	{
+		configure(
+			corner_p00,
+			corner_p10,
+			corner_p11,
+			corner_p01,
+			material,
+			new Vector2(0, 0),
+			new Vector2(1, 0),
+			new Vector2(1, 1),
+			new Vector2(0, 1),
+			patch_mesh_subdivisions);
+	}
+
+	/// <param name="uv_corner_p00">UV at <paramref name="corner_p00"/> (matches cubed-sphere face layout from <see cref="WorldBuilder"/>).</param>
+	public void configure(
+		Vector3 corner_p00,
+		Vector3 corner_p10,
+		Vector3 corner_p11,
+		Vector3 corner_p01,
+		Material material,
+		Vector2 uv_corner_p00,
+		Vector2 uv_corner_p10,
+		Vector2 uv_corner_p11,
+		Vector2 uv_corner_p01,
+		int patch_mesh_subdivisions)
 	{
 		corner_00 = corner_p00;
 		corner_10 = corner_p10;
 		corner_11 = corner_p11;
 		corner_01 = corner_p01;
+		uv_00 = uv_corner_p00;
+		uv_10 = uv_corner_p10;
+		uv_11 = uv_corner_p11;
+		uv_01 = uv_corner_p01;
+		mesh_subdivisions = Mathf.Max(1, patch_mesh_subdivisions);
 		planet_material = material;
 		is_configured = true;
 	}
@@ -178,19 +215,34 @@ public partial class WorldBuilderPlane : Node3D
 			midpointOnSphere(corner_00, corner_11),
 			midpointOnSphere(corner_10, corner_01));
 
-		addChildPlane(corner_00, e0, c, e3, 0);
-		addChildPlane(e0, corner_10, e1, c, 1);
-		addChildPlane(c, e1, corner_11, e2, 2);
-		addChildPlane(e3, c, e2, corner_01, 3);
+		Vector2 ue0 = (uv_00 + uv_10) * 0.5f;
+		Vector2 ue1 = (uv_10 + uv_11) * 0.5f;
+		Vector2 ue2 = (uv_11 + uv_01) * 0.5f;
+		Vector2 ue3 = (uv_01 + uv_00) * 0.5f;
+		Vector2 uc = (uv_00 + uv_10 + uv_11 + uv_01) * 0.25f;
+
+		addChildPlane(corner_00, e0, c, e3, uv_00, ue0, uc, ue3, 0);
+		addChildPlane(e0, corner_10, e1, c, ue0, uv_10, ue1, uc, 1);
+		addChildPlane(c, e1, corner_11, e2, uc, ue1, uv_11, ue2, 2);
+		addChildPlane(e3, c, e2, corner_01, ue3, uc, ue2, uv_01, 3);
 	}
 
-	private void addChildPlane(Vector3 c00, Vector3 c10, Vector3 c11, Vector3 c01, int child_index)
+	private void addChildPlane(
+		Vector3 c00,
+		Vector3 c10,
+		Vector3 c11,
+		Vector3 c01,
+		Vector2 u00,
+		Vector2 u10,
+		Vector2 u11,
+		Vector2 u01,
+		int child_index)
 	{
 		var child = new WorldBuilderPlane();
 		child.Name = "Sub_" + child_index;
 		child.max_lod_depth = max_lod_depth;
 		child.lod_update_interval_seconds = lod_update_interval_seconds;
-		child.configure(c00, c10, c11, c01, planet_material);
+		child.configure(c00, c10, c11, c01, planet_material, u00, u10, u11, u01, mesh_subdivisions);
 		AddChild(child);
 		assignOwnerForEditorSave(child);
 	}
@@ -239,12 +291,32 @@ public partial class WorldBuilderPlane : Node3D
 
 		Position = face_midpoint - parent_patch_mid;
 
-		ArrayMesh face_mesh = buildQuadPatchMeshFromSphereCorners(
+		var vertices = new List<Vector3>();
+		var normals = new List<Vector3>();
+		var uvs = new List<Vector2>();
+		WorldBuilder.appendTessellatedSphericalQuadLocalToPatch(
 			corner_00,
 			corner_10,
 			corner_11,
 			corner_01,
-			face_midpoint);
+			uv_00,
+			uv_10,
+			uv_11,
+			uv_01,
+			mesh_subdivisions,
+			face_midpoint,
+			vertices,
+			normals,
+			uvs);
+
+		var arrays = new Godot.Collections.Array();
+		arrays.Resize((int)Mesh.ArrayType.Max);
+		arrays[(int)Mesh.ArrayType.Vertex] = vertices.ToArray();
+		arrays[(int)Mesh.ArrayType.Normal] = normals.ToArray();
+		arrays[(int)Mesh.ArrayType.TexUV] = uvs.ToArray();
+
+		var face_mesh = new ArrayMesh();
+		face_mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
 
 		MeshInstance3D mesh_instance = GetNodeOrNull<MeshInstance3D>(mesh_child_name);
 		if (mesh_instance == null)
@@ -292,82 +364,6 @@ public partial class WorldBuilderPlane : Node3D
 		{
 			mesh_instance.Owner = root;
 		}
-	}
-
-	private static ArrayMesh buildQuadPatchMeshFromSphereCorners(
-		Vector3 p00,
-		Vector3 p10,
-		Vector3 p11,
-		Vector3 p01,
-		Vector3 patch_face_center)
-	{
-		var vertices = new List<Vector3>();
-		var normals = new List<Vector3>();
-		var uvs = new List<Vector2>();
-
-		addTriangleWorld(
-			vertices,
-			normals,
-			uvs,
-			patch_face_center,
-			p00,
-			p10,
-			p11,
-			new Vector2(0, 0),
-			new Vector2(1, 0),
-			new Vector2(1, 1));
-		addTriangleWorld(
-			vertices,
-			normals,
-			uvs,
-			patch_face_center,
-			p00,
-			p11,
-			p01,
-			new Vector2(0, 0),
-			new Vector2(1, 1),
-			new Vector2(0, 1));
-
-		var arrays = new Godot.Collections.Array();
-		arrays.Resize((int)Mesh.ArrayType.Max);
-		arrays[(int)Mesh.ArrayType.Vertex] = vertices.ToArray();
-		arrays[(int)Mesh.ArrayType.Normal] = normals.ToArray();
-		arrays[(int)Mesh.ArrayType.TexUV] = uvs.ToArray();
-
-		var mesh = new ArrayMesh();
-		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
-		return mesh;
-	}
-
-	private static void addTriangleWorld(
-		List<Vector3> vertices,
-		List<Vector3> normals,
-		List<Vector2> uvs,
-		Vector3 patch_center,
-		Vector3 wa,
-		Vector3 wb,
-		Vector3 wc,
-		Vector2 uv_a,
-		Vector2 uv_b,
-		Vector2 uv_c)
-	{
-		Vector3 flat_normal = (wb - wa).Cross(wc - wa).Normalized();
-		Vector3 tri_center = (wa + wb + wc) / 3.0f;
-		if (flat_normal.Dot(tri_center) > 0.0f)
-		{
-			(wb, wc) = (wc, wb);
-			(uv_b, uv_c) = (uv_c, uv_b);
-		}
-
-		vertices.Add(wa - patch_center);
-		vertices.Add(wb - patch_center);
-		vertices.Add(wc - patch_center);
-		normals.Add(wa.Normalized());
-		normals.Add(wb.Normalized());
-		normals.Add(wc.Normalized());
-		uvs.Add(uv_a);
-		uvs.Add(uv_b);
-		uvs.Add(uv_c);
 	}
 
 	private static Vector3 computeShellPatchFaceCenter(Vector3 p00, Vector3 p10, Vector3 p11, Vector3 p01)
