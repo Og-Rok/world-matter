@@ -157,7 +157,7 @@ public partial class WorldBuilderPlane : Node3D
 
 		float distance = getDistanceToLodTracker();
 		float subdivide_threshold = divide_distance;
-		if (max_lod_depth > 0 && getLodDepth() == max_lod_depth - 1)
+		if (max_lod_depth > 0 && getLodDepth() >= max_lod_depth - 2)
 		{
 			subdivide_threshold *= 4f;
 		}
