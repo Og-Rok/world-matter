@@ -1,10 +1,12 @@
 using Godot;
+using System;
 using System.Collections.Generic;
 
 /// <summary>
 /// Cubed-sphere quadtree roots: <c>6 × 2 × 2 = 24</c> <see cref="WorldBuilderPlane"/> patches (four children per patch when LOD splits).
 /// <see cref="mesh_subdivisions"/> refines mesh density on non-deepest patches; <see cref="mesh_subdivisions_final_lod"/> applies at <see cref="shell_max_lod_depth"/>.
 /// GPU heightmap, noise, and LOD (<see cref="shell_max_lod_depth"/>, <see cref="compute_shader_path"/>, etc.) are configured on this node.
+/// Shell heightmap compute is queued here: one dispatch in flight, readback after <see cref="shell_gpu_heightmap_wait_frames_before_readback"/> frames (no main-thread sync in patch rebuild).
 /// </summary>
 [Tool]
 public partial class WorldBuilder : Node3D
@@ -64,9 +66,299 @@ public partial class WorldBuilder : Node3D
 	[Export(PropertyHint.Range, "0,100000,0.01,or_greater")]
 	public float shell_patch_noise_physical_size = 0.0f;
 
+	/// <summary>Frames to wait after GPU submit before <c>Sync</c> + readback (spreads work across frames).</summary>
+	[Export(PropertyHint.Range, "1,32,1")]
+	public int shell_gpu_heightmap_wait_frames_before_readback = 2;
+
+	private const int heightmap_params_byte_count = 6 * 16;
+
+	private readonly List<ShellHeightmapPendingJob> shell_heightmap_pending = new();
+	private ShellHeightmapInFlightJob shell_heightmap_in_flight;
+
 	public override void _Ready()
 	{
 		rebuildPlanetShells();
+	}
+
+	public override void _Process(double delta)
+	{
+		processShellHeightmapQueue();
+	}
+
+	private sealed class ShellHeightmapInFlightJob
+	{
+		public WorldBuilderPlane plane;
+		public int resolution;
+		public int request_serial;
+		public RenderingDevice rd;
+		public Rid height_buffer_rid;
+		public Rid params_buffer_rid;
+		public Rid shader_rid;
+		public Rid pipeline_rid;
+		public Rid uniform_set_rid;
+		public int height_bytes;
+		public int frames_waited;
+	}
+
+	internal void enqueueShellHeightmapJob(ShellHeightmapPendingJob job)
+	{
+		if (job.plane == null || !GodotObject.IsInstanceValid(job.plane))
+		{
+			return;
+		}
+
+		shell_heightmap_pending.RemoveAll(j => ReferenceEquals(j.plane, job.plane));
+		shell_heightmap_pending.Add(job);
+	}
+
+	private static int compareShellHeightmapPendingJobs(ShellHeightmapPendingJob a, ShellHeightmapPendingJob b)
+	{
+		float da = getShellHeightmapPendingSortDistance(a);
+		float db = getShellHeightmapPendingSortDistance(b);
+		int by_distance = da.CompareTo(db);
+		if (by_distance != 0)
+		{
+			return by_distance;
+		}
+
+		return getShellHeightmapPendingSortLodDepth(b).CompareTo(getShellHeightmapPendingSortLodDepth(a));
+	}
+
+	private static float getShellHeightmapPendingSortDistance(ShellHeightmapPendingJob j)
+	{
+		if (j.plane == null || !GodotObject.IsInstanceValid(j.plane))
+		{
+			return float.MaxValue;
+		}
+
+		return j.plane.getDistanceToLodTrackerForQueueSort();
+	}
+
+	private static int getShellHeightmapPendingSortLodDepth(ShellHeightmapPendingJob j)
+	{
+		if (j.plane == null || !GodotObject.IsInstanceValid(j.plane))
+		{
+			return -1;
+		}
+
+		return j.plane.getShellLodDepthForQueueSort();
+	}
+
+	internal void unregisterShellHeightmapJobsForPlane(WorldBuilderPlane plane)
+	{
+		shell_heightmap_pending.RemoveAll(j => ReferenceEquals(j.plane, plane));
+		if (shell_heightmap_in_flight != null && ReferenceEquals(shell_heightmap_in_flight.plane, plane))
+		{
+			shell_heightmap_in_flight.plane = null;
+		}
+	}
+
+	private void processShellHeightmapQueue()
+	{
+		if (shell_heightmap_in_flight != null)
+		{
+			shell_heightmap_in_flight.frames_waited++;
+			int wait_need = Mathf.Max(1, shell_gpu_heightmap_wait_frames_before_readback);
+			if (shell_heightmap_in_flight.frames_waited < wait_need)
+			{
+				return;
+			}
+
+			completeShellHeightmapInFlight();
+		}
+
+		if (shell_heightmap_pending.Count > 0)
+		{
+			shell_heightmap_pending.Sort(compareShellHeightmapPendingJobs);
+		}
+
+		while (shell_heightmap_pending.Count > 0)
+		{
+			ShellHeightmapPendingJob next = shell_heightmap_pending[0];
+			shell_heightmap_pending.RemoveAt(0);
+			if (next.plane == null || !GodotObject.IsInstanceValid(next.plane))
+			{
+				continue;
+			}
+
+			shell_heightmap_in_flight = tryBeginShellHeightmapJob(next);
+			if (shell_heightmap_in_flight != null)
+			{
+				break;
+			}
+		}
+	}
+
+	private ShellHeightmapInFlightJob tryBeginShellHeightmapJob(ShellHeightmapPendingJob job)
+	{
+		var shader_file = GD.Load<RDShaderFile>(job.shader_path);
+		if (shader_file == null)
+		{
+			GD.PushError($"WorldBuilder: could not load compute shader at {job.shader_path}");
+			return null;
+		}
+
+		var rd = RenderingServer.CreateLocalRenderingDevice();
+		if (rd == null)
+		{
+			GD.PushError("WorldBuilder: CreateLocalRenderingDevice failed (use Forward+ or Mobile renderer).");
+			return null;
+		}
+
+		RDShaderSpirV spirv = shader_file.GetSpirV();
+		Rid shader_rid = rd.ShaderCreateFromSpirV(spirv);
+		if (!shader_rid.IsValid)
+		{
+			GD.PushError("WorldBuilder: ShaderCreateFromSpirV failed.");
+			rd.Free();
+			return null;
+		}
+
+		int resolution = job.resolution;
+		int height_count = resolution * resolution;
+		int height_bytes = height_count * sizeof(float);
+		Rid height_buffer_rid = rd.StorageBufferCreate((uint)height_bytes, Array.Empty<byte>());
+
+		var params_bytes = new byte[heightmap_params_byte_count];
+		float layers = Mathf.Clamp(job.noise_layers, 1, 16);
+		writeVec4ToHeightmapParams(params_bytes, 0, new Vector4(resolution, job.noise_scale, layers, 1.0f));
+		writeVec4ToHeightmapParams(params_bytes, 16, Vector4.Zero);
+		writeVec4ToHeightmapParams(params_bytes, 32, new Vector4(job.corner_00.X, job.corner_00.Y, job.corner_00.Z, 0.0f));
+		writeVec4ToHeightmapParams(params_bytes, 48, new Vector4(job.corner_10.X, job.corner_10.Y, job.corner_10.Z, 0.0f));
+		writeVec4ToHeightmapParams(params_bytes, 64, new Vector4(job.corner_11.X, job.corner_11.Y, job.corner_11.Z, 0.0f));
+		writeVec4ToHeightmapParams(params_bytes, 80, new Vector4(job.corner_01.X, job.corner_01.Y, job.corner_01.Z, 0.0f));
+		Rid params_buffer_rid = rd.StorageBufferCreate((uint)params_bytes.Length, params_bytes);
+
+		var uniform_params = new RDUniform
+		{
+			UniformType = RenderingDevice.UniformType.StorageBuffer,
+			Binding = 0
+		};
+		uniform_params.AddId(params_buffer_rid);
+
+		var uniform_heights = new RDUniform
+		{
+			UniformType = RenderingDevice.UniformType.StorageBuffer,
+			Binding = 1
+		};
+		uniform_heights.AddId(height_buffer_rid);
+
+		var uniforms = new Godot.Collections.Array<RDUniform> { uniform_params, uniform_heights };
+		Rid uniform_set_rid = rd.UniformSetCreate(uniforms, shader_rid, 0);
+		if (!uniform_set_rid.IsValid)
+		{
+			GD.PushError("WorldBuilder: UniformSetCreate failed.");
+			freeHeightmapRenderingDevice(rd, height_buffer_rid, params_buffer_rid, shader_rid, default, default);
+			return null;
+		}
+
+		Rid pipeline_rid = rd.ComputePipelineCreate(shader_rid);
+		int groups = Mathf.CeilToInt(resolution / 8.0f);
+		long cl = rd.ComputeListBegin();
+		rd.ComputeListBindComputePipeline(cl, pipeline_rid);
+		rd.ComputeListBindUniformSet(cl, uniform_set_rid, 0);
+		rd.ComputeListDispatch(cl, (uint)groups, (uint)groups, 1);
+		rd.ComputeListEnd();
+
+		rd.Submit();
+
+		return new ShellHeightmapInFlightJob
+		{
+			plane = job.plane,
+			resolution = resolution,
+			request_serial = job.request_serial,
+			rd = rd,
+			height_buffer_rid = height_buffer_rid,
+			params_buffer_rid = params_buffer_rid,
+			shader_rid = shader_rid,
+			pipeline_rid = pipeline_rid,
+			uniform_set_rid = uniform_set_rid,
+			height_bytes = height_bytes,
+			frames_waited = 0
+		};
+	}
+
+	private void completeShellHeightmapInFlight()
+	{
+		ShellHeightmapInFlightJob job = shell_heightmap_in_flight;
+		shell_heightmap_in_flight = null;
+		if (job == null || job.rd == null)
+		{
+			return;
+		}
+
+		job.rd.Sync();
+
+		byte[] raw = job.rd.BufferGetData(job.height_buffer_rid);
+		WorldBuilderPlane plane = job.plane;
+		bool plane_ok = plane != null && GodotObject.IsInstanceValid(plane);
+
+		freeHeightmapRenderingDevice(
+			job.rd,
+			job.height_buffer_rid,
+			job.params_buffer_rid,
+			job.shader_rid,
+			job.pipeline_rid,
+			job.uniform_set_rid);
+
+		if (!plane_ok)
+		{
+			return;
+		}
+
+		if (raw == null || raw.Length < job.height_bytes)
+		{
+			GD.PushError("WorldBuilder: heightmap BufferGetData returned unexpected size.");
+			return;
+		}
+
+		var heights = new float[job.resolution * job.resolution];
+		Buffer.BlockCopy(raw, 0, heights, 0, job.height_bytes);
+		plane.applyQueuedShellHeightmapReadback(job.request_serial, heights, job.resolution);
+	}
+
+	private static void freeHeightmapRenderingDevice(
+		RenderingDevice rd,
+		Rid height_buffer_rid,
+		Rid params_buffer_rid,
+		Rid shader_rid,
+		Rid pipeline_rid,
+		Rid uniform_set_rid)
+	{
+		if (uniform_set_rid.IsValid)
+		{
+			rd.FreeRid(uniform_set_rid);
+		}
+
+		if (pipeline_rid.IsValid)
+		{
+			rd.FreeRid(pipeline_rid);
+		}
+
+		if (shader_rid.IsValid)
+		{
+			rd.FreeRid(shader_rid);
+		}
+
+		if (height_buffer_rid.IsValid)
+		{
+			rd.FreeRid(height_buffer_rid);
+		}
+
+		if (params_buffer_rid.IsValid)
+		{
+			rd.FreeRid(params_buffer_rid);
+		}
+
+		rd.Free();
+	}
+
+	private static void writeVec4ToHeightmapParams(byte[] buf, int offset, Vector4 vec)
+	{
+		BitConverter.GetBytes(vec.X).CopyTo(buf, offset);
+		BitConverter.GetBytes(vec.Y).CopyTo(buf, offset + 4);
+		BitConverter.GetBytes(vec.Z).CopyTo(buf, offset + 8);
+		BitConverter.GetBytes(vec.W).CopyTo(buf, offset + 12);
 	}
 
 	private void rebuildPlanetShells()

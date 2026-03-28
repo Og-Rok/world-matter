@@ -50,12 +50,8 @@ public partial class WorldBuilderPlane : Node3D
 	private bool is_configured;
 	private double lod_time_accum;
 
-	private RenderingDevice heightmap_rd;
-	private Rid heightmap_height_buffer_rid;
-	private Rid heightmap_params_buffer_rid;
-	private Rid heightmap_shader_rid;
-	private Rid heightmap_pipeline_rid;
-	private Rid heightmap_uniform_set_rid;
+	/// <summary>Bumped each GPU heightmap request; stale readbacks are dropped.</summary>
+	private int shell_heightmap_request_serial;
 
 	/// <summary>Call before the node enters the scene tree. UVs default to the full unit quad; final LOD tessellation defaults to 8.</summary>
 	public void configure(
@@ -132,7 +128,7 @@ public partial class WorldBuilderPlane : Node3D
 
 	public override void _ExitTree()
 	{
-		freeHeightmapComputeResources();
+		findAncestorWorldBuilderForThisPlane()?.unregisterShellHeightmapJobsForPlane(this);
 		base._ExitTree();
 	}
 
@@ -168,6 +164,10 @@ public partial class WorldBuilderPlane : Node3D
 
 		bool should_subdivide = distance < subdivide_threshold && subdivide_threshold > 1e-5f && getLodDepth() < max_lod_depth;
 		bool has_plane_children = hasWorldBuilderPlaneChildren();
+		if (has_plane_children)
+		{
+			freeMeshChild();
+		}
 
 		if (should_subdivide && has_plane_children)
 		{
@@ -181,6 +181,7 @@ public partial class WorldBuilderPlane : Node3D
 
 		if (should_subdivide)
 		{
+			findAncestorWorldBuilderForThisPlane()?.unregisterShellHeightmapJobsForPlane(this);
 			freeMeshChild();
 			if (!hasWorldBuilderPlaneChildren())
 			{
@@ -223,6 +224,23 @@ public partial class WorldBuilderPlane : Node3D
 		Vector3 cam = LODTracker.instance.GlobalPosition;
 		getWorldCornersForDistance(out Vector3 w00, out Vector3 w10, out Vector3 w11, out Vector3 w01);
 		return WorldPatchGeometry.distancePointToPatchQuad(cam, w00, w10, w11, w01);
+	}
+
+	/// <summary>Live distance for <see cref="WorldBuilder"/> queue ordering (closest patches first).</summary>
+	internal float getDistanceToLodTrackerForQueueSort()
+	{
+		if (LODTracker.instance == null)
+		{
+			return float.MaxValue;
+		}
+
+		return getDistanceToLodTracker();
+	}
+
+	/// <summary>Quadtree depth for queue tie-break (deeper / finer patches first when distances match).</summary>
+	internal int getShellLodDepthForQueueSort()
+	{
+		return getLodDepth();
 	}
 
 	private void getWorldCornersForDistance(out Vector3 w00, out Vector3 w10, out Vector3 w11, out Vector3 w01)
@@ -336,6 +354,12 @@ public partial class WorldBuilderPlane : Node3D
 
 	private void rebuildShellMesh()
 	{
+		if (hasWorldBuilderPlaneChildren())
+		{
+			freeMeshChild();
+			return;
+		}
+
 		float max_corner_span = maxDistanceAmongFourCorners(corner_00, corner_10, corner_11, corner_01);
 		divide_distance = max_corner_span * 0.5f;
 
@@ -349,9 +373,32 @@ public partial class WorldBuilderPlane : Node3D
 		int n = getEffectiveMeshSubdivisions();
 		int res = n + 1;
 		float[] heights = null;
+		bool gpu_queued = false;
 		if (use_gpu_heightmap)
 		{
-			heights = runHeightmapCompute(res);
+			WorldBuilder wb = findAncestorWorldBuilderForThisPlane();
+			if (wb != null)
+			{
+				shell_heightmap_request_serial++;
+				wb.enqueueShellHeightmapJob(new ShellHeightmapPendingJob
+				{
+					plane = this,
+					resolution = res,
+					request_serial = shell_heightmap_request_serial,
+					shader_path = compute_shader_path,
+					noise_scale = noise_scale,
+					noise_layers = noise_layers,
+					corner_00 = corner_00,
+					corner_10 = corner_10,
+					corner_11 = corner_11,
+					corner_01 = corner_01
+				});
+				gpu_queued = true;
+			}
+			else
+			{
+				heights = runHeightmapComputeSynchronously(res);
+			}
 		}
 
 		int[] index_array = null;
@@ -370,7 +417,7 @@ public partial class WorldBuilderPlane : Node3D
 		}
 		else
 		{
-			if (use_gpu_heightmap && heights == null)
+			if (use_gpu_heightmap && heights == null && !gpu_queued)
 			{
 				GD.PushWarning("WorldBuilderPlane: GPU heightmap failed; using flat tessellation.");
 			}
@@ -400,6 +447,57 @@ public partial class WorldBuilderPlane : Node3D
 		{
 			arrays[(int)Mesh.ArrayType.Index] = index_array;
 		}
+
+		var face_mesh = new ArrayMesh();
+		face_mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+
+		MeshInstance3D mesh_instance = GetNodeOrNull<MeshInstance3D>(mesh_child_name);
+		if (mesh_instance == null)
+		{
+			mesh_instance = new MeshInstance3D { Name = mesh_child_name };
+			AddChild(mesh_instance);
+		}
+
+		mesh_instance.Mesh = face_mesh;
+		applyMaterialToMesh(mesh_instance);
+	}
+
+	/// <summary>Called from <see cref="WorldBuilder"/> after async GPU readback; ignores stale serials.</summary>
+	internal void applyQueuedShellHeightmapReadback(int request_serial, float[] heights, int resolution)
+	{
+		if (!is_configured || request_serial != shell_heightmap_request_serial)
+		{
+			return;
+		}
+
+		if (heights == null || heights.Length != resolution * resolution)
+		{
+			return;
+		}
+
+		Vector3 face_midpoint = computeShellPatchFaceCenter(corner_00, corner_10, corner_11, corner_01);
+		rebuildShellMeshSurfaceFromHeights(heights, resolution, face_midpoint);
+	}
+
+	private void rebuildShellMeshSurfaceFromHeights(float[] heights, int res, Vector3 face_midpoint)
+	{
+		if (hasWorldBuilderPlaneChildren())
+		{
+			return;
+		}
+
+		var vertices = new List<Vector3>();
+		var normals = new List<Vector3>();
+		var uvs = new List<Vector2>();
+		var indices = new List<int>();
+		buildTessellatedPatchMeshFromHeights(heights, res, face_midpoint, vertices, normals, uvs, indices);
+
+		var arrays = new Godot.Collections.Array();
+		arrays.Resize((int)Mesh.ArrayType.Max);
+		arrays[(int)Mesh.ArrayType.Vertex] = vertices.ToArray();
+		arrays[(int)Mesh.ArrayType.Normal] = normals.ToArray();
+		arrays[(int)Mesh.ArrayType.TexUV] = uvs.ToArray();
+		arrays[(int)Mesh.ArrayType.Index] = indices.ToArray();
 
 		var face_mesh = new ArrayMesh();
 		face_mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
@@ -537,7 +635,8 @@ public partial class WorldBuilderPlane : Node3D
 		BitConverter.GetBytes(vec.W).CopyTo(buf, offset + 12);
 	}
 
-	private float[] runHeightmapCompute(int resolution)
+	/// <summary>Blocking GPU path when no <see cref="WorldBuilder"/> ancestor exists (e.g. editor) or run synchronously.</summary>
+	private float[] runHeightmapComputeSynchronously(int resolution)
 	{
 		var shader_file = GD.Load<RDShaderFile>(compute_shader_path);
 		if (shader_file == null)
@@ -546,25 +645,25 @@ public partial class WorldBuilderPlane : Node3D
 			return null;
 		}
 
-		heightmap_rd = RenderingServer.CreateLocalRenderingDevice();
-		if (heightmap_rd == null)
+		RenderingDevice rd = RenderingServer.CreateLocalRenderingDevice();
+		if (rd == null)
 		{
 			GD.PushError("WorldBuilderPlane: CreateLocalRenderingDevice failed (use Forward+ or Mobile renderer).");
 			return null;
 		}
 
 		RDShaderSpirV spirv = shader_file.GetSpirV();
-		heightmap_shader_rid = heightmap_rd.ShaderCreateFromSpirV(spirv);
-		if (!heightmap_shader_rid.IsValid)
+		Rid shader_rid = rd.ShaderCreateFromSpirV(spirv);
+		if (!shader_rid.IsValid)
 		{
 			GD.PushError("WorldBuilderPlane: ShaderCreateFromSpirV failed.");
-			freeHeightmapComputeResources();
+			rd.Free();
 			return null;
 		}
 
 		int height_count = resolution * resolution;
 		int height_bytes = height_count * sizeof(float);
-		heightmap_height_buffer_rid = heightmap_rd.StorageBufferCreate((uint)height_bytes, Array.Empty<byte>());
+		Rid height_buffer_rid = rd.StorageBufferCreate((uint)height_bytes, Array.Empty<byte>());
 
 		var params_bytes = new byte[heightmap_params_byte_count];
 		float layers = Mathf.Clamp(noise_layers, 1, 16);
@@ -577,96 +676,91 @@ public partial class WorldBuilderPlane : Node3D
 		writeVec4ToByteBuffer(params_bytes, 48, new Vector4(corner_10.X, corner_10.Y, corner_10.Z, 0.0f));
 		writeVec4ToByteBuffer(params_bytes, 64, new Vector4(corner_11.X, corner_11.Y, corner_11.Z, 0.0f));
 		writeVec4ToByteBuffer(params_bytes, 80, new Vector4(corner_01.X, corner_01.Y, corner_01.Z, 0.0f));
-		heightmap_params_buffer_rid = heightmap_rd.StorageBufferCreate((uint)params_bytes.Length, params_bytes);
+		Rid params_buffer_rid = rd.StorageBufferCreate((uint)params_bytes.Length, params_bytes);
 
 		var uniform_params = new RDUniform
 		{
 			UniformType = RenderingDevice.UniformType.StorageBuffer,
 			Binding = 0
 		};
-		uniform_params.AddId(heightmap_params_buffer_rid);
+		uniform_params.AddId(params_buffer_rid);
 
 		var uniform_heights = new RDUniform
 		{
 			UniformType = RenderingDevice.UniformType.StorageBuffer,
 			Binding = 1
 		};
-		uniform_heights.AddId(heightmap_height_buffer_rid);
+		uniform_heights.AddId(height_buffer_rid);
 
 		var uniforms = new Godot.Collections.Array<RDUniform> { uniform_params, uniform_heights };
-		heightmap_uniform_set_rid = heightmap_rd.UniformSetCreate(uniforms, heightmap_shader_rid, 0);
-		if (!heightmap_uniform_set_rid.IsValid)
+		Rid uniform_set_rid = rd.UniformSetCreate(uniforms, shader_rid, 0);
+		if (!uniform_set_rid.IsValid)
 		{
 			GD.PushError("WorldBuilderPlane: UniformSetCreate failed.");
-			freeHeightmapComputeResources();
+			freeLocalHeightmapDevice(rd, height_buffer_rid, params_buffer_rid, shader_rid, default, default);
 			return null;
 		}
 
-		heightmap_pipeline_rid = heightmap_rd.ComputePipelineCreate(heightmap_shader_rid);
+		Rid pipeline_rid = rd.ComputePipelineCreate(shader_rid);
 		int groups = Mathf.CeilToInt(resolution / 8.0f);
-		long cl = heightmap_rd.ComputeListBegin();
-		heightmap_rd.ComputeListBindComputePipeline(cl, heightmap_pipeline_rid);
-		heightmap_rd.ComputeListBindUniformSet(cl, heightmap_uniform_set_rid, 0);
-		heightmap_rd.ComputeListDispatch(cl, (uint)groups, (uint)groups, 1);
-		heightmap_rd.ComputeListEnd();
+		long cl = rd.ComputeListBegin();
+		rd.ComputeListBindComputePipeline(cl, pipeline_rid);
+		rd.ComputeListBindUniformSet(cl, uniform_set_rid, 0);
+		rd.ComputeListDispatch(cl, (uint)groups, (uint)groups, 1);
+		rd.ComputeListEnd();
 
-		heightmap_rd.Submit();
-		heightmap_rd.Sync();
+		rd.Submit();
+		rd.Sync();
 
-		byte[] raw = heightmap_rd.BufferGetData(heightmap_height_buffer_rid);
+		byte[] raw = rd.BufferGetData(height_buffer_rid);
 		if (raw == null || raw.Length < height_bytes)
 		{
 			GD.PushError("WorldBuilderPlane: BufferGetData returned unexpected size.");
-			freeHeightmapComputeResources();
+			freeLocalHeightmapDevice(rd, height_buffer_rid, params_buffer_rid, shader_rid, pipeline_rid, uniform_set_rid);
 			return null;
 		}
 
 		var heights = new float[height_count];
 		Buffer.BlockCopy(raw, 0, heights, 0, height_bytes);
 
-		freeHeightmapComputeResources();
+		freeLocalHeightmapDevice(rd, height_buffer_rid, params_buffer_rid, shader_rid, pipeline_rid, uniform_set_rid);
 		return heights;
 	}
 
-	private void freeHeightmapComputeResources()
+	private static void freeLocalHeightmapDevice(
+		RenderingDevice rd,
+		Rid height_buffer_rid,
+		Rid params_buffer_rid,
+		Rid shader_rid,
+		Rid pipeline_rid,
+		Rid uniform_set_rid)
 	{
-		if (heightmap_rd == null)
+		if (uniform_set_rid.IsValid)
 		{
-			return;
+			rd.FreeRid(uniform_set_rid);
 		}
 
-		if (heightmap_uniform_set_rid.IsValid)
+		if (pipeline_rid.IsValid)
 		{
-			heightmap_rd.FreeRid(heightmap_uniform_set_rid);
-			heightmap_uniform_set_rid = default;
+			rd.FreeRid(pipeline_rid);
 		}
 
-		if (heightmap_pipeline_rid.IsValid)
+		if (shader_rid.IsValid)
 		{
-			heightmap_rd.FreeRid(heightmap_pipeline_rid);
-			heightmap_pipeline_rid = default;
+			rd.FreeRid(shader_rid);
 		}
 
-		if (heightmap_shader_rid.IsValid)
+		if (height_buffer_rid.IsValid)
 		{
-			heightmap_rd.FreeRid(heightmap_shader_rid);
-			heightmap_shader_rid = default;
+			rd.FreeRid(height_buffer_rid);
 		}
 
-		if (heightmap_height_buffer_rid.IsValid)
+		if (params_buffer_rid.IsValid)
 		{
-			heightmap_rd.FreeRid(heightmap_height_buffer_rid);
-			heightmap_height_buffer_rid = default;
+			rd.FreeRid(params_buffer_rid);
 		}
 
-		if (heightmap_params_buffer_rid.IsValid)
-		{
-			heightmap_rd.FreeRid(heightmap_params_buffer_rid);
-			heightmap_params_buffer_rid = default;
-		}
-
-		heightmap_rd.Free();
-		heightmap_rd = null;
+		rd.Free();
 	}
 
 	private void buildTessellatedPatchMeshFromHeights(
