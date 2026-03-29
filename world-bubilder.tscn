@@ -300,202 +300,203 @@ shader_parameter/wave_scroll_b = Vector2(-0.028, 0.04)
 [node name="World" type="Node3D" unique_id=1605994279]
 
 [node name="WorldBuilder" type="MeshInstance3D" parent="." unique_id=1165969280]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1000)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1300)
 script = ExtResource("1_4ye4k")
 radius = 1000.0
 mesh_subdivisions = 2
+mesh_subdivisions_final_lod = 7
 planet_material = SubResource("ShaderMaterial_2cgs6")
 shell_noise_layers = 1
 
-[node name="PlanetShell_0" type="Node3D" parent="WorldBuilder" unique_id=1355561997]
+[node name="PlanetShell_0" type="Node3D" parent="WorldBuilder" unique_id=591387749]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 747.8909, -321.11426, -321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_0" unique_id=1751510969]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_0" unique_id=1655555192]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_n7smf")
 
-[node name="PlanetShell_1" type="Node3D" parent="WorldBuilder" unique_id=75320301]
+[node name="PlanetShell_1" type="Node3D" parent="WorldBuilder" unique_id=809152359]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 747.8909, 321.11426, -321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_1" unique_id=370949944]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_1" unique_id=552984227]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_2cgs6")
 
-[node name="PlanetShell_2" type="Node3D" parent="WorldBuilder" unique_id=1958679145]
+[node name="PlanetShell_2" type="Node3D" parent="WorldBuilder" unique_id=1560689458]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 747.8909, -321.11426, 321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_2" unique_id=1604495803]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_2" unique_id=1878923185]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_el7cg")
 
-[node name="PlanetShell_3" type="Node3D" parent="WorldBuilder" unique_id=978123968]
+[node name="PlanetShell_3" type="Node3D" parent="WorldBuilder" unique_id=259912888]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 747.8909, 321.11426, 321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_3" unique_id=1454615340]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_3" unique_id=1522768492]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_2ajss")
 
-[node name="PlanetShell_4" type="Node3D" parent="WorldBuilder" unique_id=499169412]
+[node name="PlanetShell_4" type="Node3D" parent="WorldBuilder" unique_id=368812096]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -747.8909, -321.11426, 321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_4" unique_id=1569774889]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_4" unique_id=1294864324]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_8fvxt")
 
-[node name="PlanetShell_5" type="Node3D" parent="WorldBuilder" unique_id=1500798717]
+[node name="PlanetShell_5" type="Node3D" parent="WorldBuilder" unique_id=1083462913]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -747.8909, 321.11426, 321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_5" unique_id=205153532]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_5" unique_id=691006532]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_k7n5d")
 
-[node name="PlanetShell_6" type="Node3D" parent="WorldBuilder" unique_id=1199999996]
+[node name="PlanetShell_6" type="Node3D" parent="WorldBuilder" unique_id=1794918267]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -747.8909, -321.11426, -321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_6" unique_id=794676252]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_6" unique_id=26686593]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_1a37m")
 
-[node name="PlanetShell_7" type="Node3D" parent="WorldBuilder" unique_id=2089182686]
+[node name="PlanetShell_7" type="Node3D" parent="WorldBuilder" unique_id=103351328]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -747.8909, 321.11426, -321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_7" unique_id=670869679]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_7" unique_id=133339117]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_i7tb3")
 
-[node name="PlanetShell_8" type="Node3D" parent="WorldBuilder" unique_id=1211171180]
+[node name="PlanetShell_8" type="Node3D" parent="WorldBuilder" unique_id=2028610392]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, 747.8909, 321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_8" unique_id=1129027509]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_8" unique_id=607977766]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_x3vp5")
 
-[node name="PlanetShell_9" type="Node3D" parent="WorldBuilder" unique_id=1763444176]
+[node name="PlanetShell_9" type="Node3D" parent="WorldBuilder" unique_id=152100171]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, 747.8909, 321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_9" unique_id=1249502340]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_9" unique_id=504990020]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_36rgp")
 
-[node name="PlanetShell_10" type="Node3D" parent="WorldBuilder" unique_id=273918347]
+[node name="PlanetShell_10" type="Node3D" parent="WorldBuilder" unique_id=1973422929]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, 747.8909, -321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_10" unique_id=462931955]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_10" unique_id=1165845733]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_grhvc")
 
-[node name="PlanetShell_11" type="Node3D" parent="WorldBuilder" unique_id=387341225]
+[node name="PlanetShell_11" type="Node3D" parent="WorldBuilder" unique_id=510894564]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, 747.8909, -321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_11" unique_id=7300841]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_11" unique_id=847475890]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_6g6ss")
 
-[node name="PlanetShell_12" type="Node3D" parent="WorldBuilder" unique_id=2103547122]
+[node name="PlanetShell_12" type="Node3D" parent="WorldBuilder" unique_id=1791993313]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, -747.8909, -321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_12" unique_id=1073098577]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_12" unique_id=1217825395]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_lfcf5")
 
-[node name="PlanetShell_13" type="Node3D" parent="WorldBuilder" unique_id=1568293513]
+[node name="PlanetShell_13" type="Node3D" parent="WorldBuilder" unique_id=501803115]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, -747.8909, -321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_13" unique_id=604623211]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_13" unique_id=289572976]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_3ucu1")
 
-[node name="PlanetShell_14" type="Node3D" parent="WorldBuilder" unique_id=170481903]
+[node name="PlanetShell_14" type="Node3D" parent="WorldBuilder" unique_id=745904304]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, -747.8909, 321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_14" unique_id=1859906020]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_14" unique_id=309918647]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_dos0w")
 
-[node name="PlanetShell_15" type="Node3D" parent="WorldBuilder" unique_id=684331928]
+[node name="PlanetShell_15" type="Node3D" parent="WorldBuilder" unique_id=80366625]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, -747.8909, 321.11426)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_15" unique_id=1957823191]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_15" unique_id=853214111]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_opoyr")
 
-[node name="PlanetShell_16" type="Node3D" parent="WorldBuilder" unique_id=130408718]
+[node name="PlanetShell_16" type="Node3D" parent="WorldBuilder" unique_id=70929265]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, -321.11426, -747.8909)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_16" unique_id=1510173898]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_16" unique_id=541883543]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_10jxi")
 
-[node name="PlanetShell_17" type="Node3D" parent="WorldBuilder" unique_id=931338218]
+[node name="PlanetShell_17" type="Node3D" parent="WorldBuilder" unique_id=1857722178]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, 321.11426, -747.8909)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_17" unique_id=947527346]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_17" unique_id=1982095477]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_p4102")
 
-[node name="PlanetShell_18" type="Node3D" parent="WorldBuilder" unique_id=1282912511]
+[node name="PlanetShell_18" type="Node3D" parent="WorldBuilder" unique_id=1346360956]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, -321.11426, -747.8909)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_18" unique_id=928630063]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_18" unique_id=354506546]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_rd7xq")
 
-[node name="PlanetShell_19" type="Node3D" parent="WorldBuilder" unique_id=818140062]
+[node name="PlanetShell_19" type="Node3D" parent="WorldBuilder" unique_id=1479474606]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, 321.11426, -747.8909)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_19" unique_id=1702881902]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_19" unique_id=122845019]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_xbnih")
 
-[node name="PlanetShell_20" type="Node3D" parent="WorldBuilder" unique_id=2021774068]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, -321.11426, 747.8909)
+[node name="PlanetShell_20" type="Node3D" parent="WorldBuilder" unique_id=296358505]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, -321.11426, 747.89087)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_20" unique_id=1293121400]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_20" unique_id=779046328]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_77j8j")
 
-[node name="PlanetShell_21" type="Node3D" parent="WorldBuilder" unique_id=1844290434]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, 321.11426, 747.8909)
+[node name="PlanetShell_21" type="Node3D" parent="WorldBuilder" unique_id=824284150]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 321.11426, 321.11426, 747.89087)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_21" unique_id=1431329305]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_21" unique_id=837741467]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_6ek14")
 
-[node name="PlanetShell_22" type="Node3D" parent="WorldBuilder" unique_id=1912045910]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, -321.11426, 747.8909)
+[node name="PlanetShell_22" type="Node3D" parent="WorldBuilder" unique_id=1042809483]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, -321.11426, 747.89087)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_22" unique_id=872462057]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_22" unique_id=1875994099]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_3m0aq")
 
-[node name="PlanetShell_23" type="Node3D" parent="WorldBuilder" unique_id=1281826014]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, 321.11426, 747.8909)
+[node name="PlanetShell_23" type="Node3D" parent="WorldBuilder" unique_id=2006164345]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -321.11426, 321.11426, 747.89087)
 script = ExtResource("2_yjjwd")
 
-[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_23" unique_id=1858797810]
+[node name="Mesh" type="MeshInstance3D" parent="WorldBuilder/PlanetShell_23" unique_id=491952450]
 material_override = SubResource("ShaderMaterial_2cgs6")
 mesh = SubResource("ArrayMesh_edqqq")
 

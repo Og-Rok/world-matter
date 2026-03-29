@@ -6,6 +6,7 @@ using System.Collections.Generic;
 /// One planet shell quad: four corner positions in <see cref="WorldBuilder"/> (planet) space, transform and mesh
 /// so the patch sits on the sphere; optional LOD via <see cref="LODTracker"/> splits into four child planes when the
 /// camera is closer than <see cref="divide_distance"/> (doubled on the last quad split tier, <c>depth == max_lod_depth - 1</c>). At <see cref="max_lod_depth"/>, mesh tessellation uses <see cref="WorldBuilder.mesh_subdivisions_final_lod"/>.
+/// GPU height noise is sampled at <c>max(mesh_subdivisions, mesh_subdivisions_final)</c> (all octaves like the finest LOD), then bilinearly downsampled to the display mesh resolution when coarser.
 /// </summary>
 [Tool]
 public partial class WorldBuilderPlane : Node3D
@@ -52,6 +53,9 @@ public partial class WorldBuilderPlane : Node3D
 
 	/// <summary>Bumped each GPU heightmap request; stale readbacks are dropped.</summary>
 	private int shell_heightmap_request_serial;
+
+	/// <summary>Display mesh subdivisions <c>n</c> for the active GPU job (noise grid may be finer).</summary>
+	private int shell_pending_gpu_mesh_subdivisions = -1;
 
 	/// <summary>Call before the node enters the scene tree. UVs default to the full unit quad; final LOD tessellation defaults to 8.</summary>
 	public void configure(
@@ -219,6 +223,15 @@ public partial class WorldBuilderPlane : Node3D
 		return mesh_subdivisions;
 	}
 
+	/// <summary>
+	/// GPU layered noise is always sampled on a grid at least as fine as <see cref="mesh_subdivisions_final"/> so all octaves
+	/// match the finest LOD; the display mesh still uses <see cref="getEffectiveMeshSubdivisions"/> with bilinear downsampled heights.
+	/// </summary>
+	private int getNoiseHeightmapSubdivisions()
+	{
+		return Mathf.Max(mesh_subdivisions, mesh_subdivisions_final);
+	}
+
 	private float getDistanceToLodTracker()
 	{
 		Vector3 cam = LODTracker.instance.GlobalPosition;
@@ -370,8 +383,10 @@ public partial class WorldBuilderPlane : Node3D
 		var normals = new List<Vector3>();
 		var uvs = new List<Vector2>();
 
-		int n = getEffectiveMeshSubdivisions();
-		int res = n + 1;
+		int n_display = getEffectiveMeshSubdivisions();
+		int n_noise = getNoiseHeightmapSubdivisions();
+		int res_display = n_display + 1;
+		int res_noise = n_noise + 1;
 		float[] heights = null;
 		bool gpu_queued = false;
 		if (use_gpu_heightmap)
@@ -380,10 +395,11 @@ public partial class WorldBuilderPlane : Node3D
 			if (wb != null)
 			{
 				shell_heightmap_request_serial++;
+				shell_pending_gpu_mesh_subdivisions = n_display;
 				wb.enqueueShellHeightmapJob(new ShellHeightmapPendingJob
 				{
 					plane = this,
-					resolution = res,
+					resolution = res_noise,
 					request_serial = shell_heightmap_request_serial,
 					shader_path = compute_shader_path,
 					noise_scale = noise_scale,
@@ -397,17 +413,21 @@ public partial class WorldBuilderPlane : Node3D
 			}
 			else
 			{
-				heights = runHeightmapComputeSynchronously(res);
+				heights = runHeightmapComputeSynchronously(res_noise);
+				if (heights != null && res_noise != res_display)
+				{
+					heights = downsampleHeightGridBilinear(heights, res_noise, res_display);
+				}
 			}
 		}
 
 		int[] index_array = null;
-		if (heights != null && heights.Length == res * res)
+		if (heights != null && heights.Length == res_display * res_display)
 		{
 			var indices = new List<int>();
 			buildTessellatedPatchMeshFromHeights(
 				heights,
-				res,
+				res_display,
 				face_midpoint,
 				vertices,
 				normals,
@@ -431,7 +451,7 @@ public partial class WorldBuilderPlane : Node3D
 				uv_10,
 				uv_11,
 				uv_01,
-				n,
+				n_display,
 				face_midpoint,
 				vertices,
 				normals,
@@ -475,8 +495,23 @@ public partial class WorldBuilderPlane : Node3D
 			return;
 		}
 
+		int res_display = shell_pending_gpu_mesh_subdivisions >= 0
+			? shell_pending_gpu_mesh_subdivisions + 1
+			: getEffectiveMeshSubdivisions() + 1;
+
+		float[] heights_for_mesh = heights;
+		if (resolution != res_display)
+		{
+			heights_for_mesh = downsampleHeightGridBilinear(heights, resolution, res_display);
+			if (heights_for_mesh == null)
+			{
+				return;
+			}
+		}
+
 		Vector3 face_midpoint = computeShellPatchFaceCenter(corner_00, corner_10, corner_11, corner_01);
-		rebuildShellMeshSurfaceFromHeights(heights, resolution, face_midpoint);
+		rebuildShellMeshSurfaceFromHeights(heights_for_mesh, res_display, face_midpoint);
+		shell_pending_gpu_mesh_subdivisions = -1;
 	}
 
 	private void rebuildShellMeshSurfaceFromHeights(float[] heights, int res, Vector3 face_midpoint)
@@ -633,6 +668,51 @@ public partial class WorldBuilderPlane : Node3D
 		BitConverter.GetBytes(vec.Y).CopyTo(buf, offset + 4);
 		BitConverter.GetBytes(vec.Z).CopyTo(buf, offset + 8);
 		BitConverter.GetBytes(vec.W).CopyTo(buf, offset + 12);
+	}
+
+	private static float[] downsampleHeightGridBilinear(float[] src, int src_res, int dst_res)
+	{
+		if (src_res == dst_res)
+		{
+			return src;
+		}
+
+		if (src == null || src.Length != src_res * src_res || dst_res < 1 || src_res < 1 || dst_res > src_res)
+		{
+			return null;
+		}
+
+		var dst = new float[dst_res * dst_res];
+		float dst_rf = Mathf.Max(dst_res - 1, 1);
+		for (int j = 0; j < dst_res; j++)
+		{
+			float tv = j / dst_rf;
+			for (int i = 0; i < dst_res; i++)
+			{
+				float tu = i / dst_rf;
+				dst[i + j * dst_res] = sampleHeightGridBilinear(src, src_res, tu, tv);
+			}
+		}
+
+		return dst;
+	}
+
+	private static float sampleHeightGridBilinear(float[] h, int res, float tu, float tv)
+	{
+		float rf = Mathf.Max(res - 1, 1);
+		float fu = Mathf.Clamp(tu * rf, 0f, rf);
+		float fv = Mathf.Clamp(tv * rf, 0f, rf);
+		int i0 = Mathf.Min(Mathf.FloorToInt(fu), res - 2);
+		int j0 = Mathf.Min(Mathf.FloorToInt(fv), res - 2);
+		i0 = Mathf.Clamp(i0, 0, res - 2);
+		j0 = Mathf.Clamp(j0, 0, res - 2);
+		float du = fu - i0;
+		float dv = fv - j0;
+		float h00 = h[i0 + j0 * res];
+		float h10 = h[i0 + 1 + j0 * res];
+		float h01 = h[i0 + (j0 + 1) * res];
+		float h11 = h[i0 + 1 + (j0 + 1) * res];
+		return Mathf.Lerp(Mathf.Lerp(h00, h10, du), Mathf.Lerp(h01, h11, du), dv);
 	}
 
 	/// <summary>Blocking GPU path when no <see cref="WorldBuilder"/> ancestor exists (e.g. editor) or run synchronously.</summary>
